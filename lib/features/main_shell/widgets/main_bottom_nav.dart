@@ -1,0 +1,160 @@
+import 'package:flutter/material.dart';
+
+import '../../../theme/app_theme.dart';
+
+class MainBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onChanged;
+
+  const MainBottomNav({
+    super.key,
+    required this.currentIndex,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 84,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFE5EAF3), width: 1),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            _NavItem(
+              index: 0,
+              selectedIndex: currentIndex,
+              icon: Icons.home_outlined,
+              selectedIcon: Icons.home_rounded,
+              label: 'Главная',
+              onTap: onChanged,
+            ),
+            _NavItem(
+              index: 1,
+              selectedIndex: currentIndex,
+              icon: Icons.description_outlined,
+              selectedIcon: Icons.description_rounded,
+              label: 'Документы',
+              onTap: onChanged,
+            ),
+            _NavItem(
+              index: 2,
+              selectedIndex: currentIndex,
+              icon: Icons.qr_code_2_rounded,
+              selectedIcon: Icons.qr_code_2_rounded,
+              label: 'OySyn QR',
+              center: true,
+              onTap: onChanged,
+            ),
+            _NavItem(
+              index: 3,
+              selectedIndex: currentIndex,
+              icon: Icons.fact_check_outlined,
+              selectedIcon: Icons.fact_check_rounded,
+              label: 'Проверить',
+              onTap: onChanged,
+            ),
+            _NavItem(
+              index: 4,
+              selectedIndex: currentIndex,
+              icon: Icons.person_outline_rounded,
+              selectedIcon: Icons.person_rounded,
+              label: 'Профиль',
+              onTap: onChanged,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final int index;
+  final int selectedIndex;
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool center;
+  final ValueChanged<int> onTap;
+
+  const _NavItem({
+    required this.index,
+    required this.selectedIndex,
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.onTap,
+    this.center = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = index == selectedIndex;
+    final color =
+        selected ? OySynAuthTokens.primaryBlue : const Color(0xFF6F7B84);
+
+    return Expanded(
+      child: InkWell(
+        onTap: () => onTap(index),
+        child: Transform.translate(
+          offset: center ? const Offset(0, -12) : Offset.zero,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (center)
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? OySynAuthTokens.primaryBlue
+                        : const Color(0xFFEAF0FF),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            OySynAuthTokens.primaryBlue.withValues(alpha: 0.18),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    selected ? selectedIcon : icon,
+                    color:
+                        selected ? Colors.white : OySynAuthTokens.primaryBlue,
+                    size: 27,
+                  ),
+                )
+              else
+                Icon(
+                  selected ? selectedIcon : icon,
+                  color: color,
+                  size: 24,
+                ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: center ? 10.5 : 11,
+                  height: 1,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

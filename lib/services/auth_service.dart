@@ -5,9 +5,18 @@ import '../storage/token_storage.dart';
 
 class AuthService {
   static const baseUrl = "http://194.146.43.172:8082/api";
+  static const _demoUsername = 'oysyn';
+  static const _demoPassword = 'qwerty';
+  static const _demoToken = 'demo_oysyn_token';
 
   /// ---------- ЛОГИН ----------
   static Future<bool> login(String email, String password) async {
+    final normalizedLogin = email.trim().toLowerCase();
+    if (normalizedLogin == _demoUsername && password == _demoPassword) {
+      await TokenStorage.saveToken(_demoToken);
+      return true;
+    }
+
     // backend ждёт x-www-form-urlencoded c полями username/password
     final res = await http.post(
       Uri.parse("$baseUrl/auth/login"),
