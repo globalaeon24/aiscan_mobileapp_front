@@ -14,38 +14,10 @@ class ScanService {
   /// 1) OCR — отправка изображения на backend
   /// ================================================================
   static Future<String> uploadImageForOCR(File file) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) {
-      throw Exception("Нет токена авторизации.");
-    }
-
-    final uri = Uri.parse("$baseUrl/scan/ocr");
-
-    final lower = file.path.toLowerCase();
-    String subtype = 'jpeg';
-    if (lower.endsWith('.png')) subtype = 'png';
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) subtype = 'jpeg';
-
-    final request = http.MultipartRequest("POST", uri);
-    request.headers["Authorization"] = "Bearer $token";
-
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        "file",
-        file.path,
-        contentType: MediaType("image", subtype),
-      ),
+    throw UnsupportedError(
+      "OCR изображения через mobile backend больше не поддерживается. "
+      "Загрузите документ через проверку /api/v1/checks.",
     );
-
-    final response = await request.send();
-    final body = await response.stream.bytesToString();
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(body);
-      return data["text"];
-    } else {
-      throw Exception("Ошибка OCR: ${response.statusCode} $body");
-    }
   }
 
   /// ================================================================
@@ -57,9 +29,13 @@ class ScanService {
       throw Exception("Нет токена авторизации.");
     }
 
-    final uri = Uri.parse("$baseUrl/scan/file");
+    final uri = Uri.parse("$baseUrl/checks");
     final request = http.MultipartRequest("POST", uri);
     request.headers["Authorization"] = "Bearer $token";
+    request.fields["title"] = _fileTitle(file);
+    request.fields["include_ocr"] = "true";
+    request.fields["ocr_languages"] = "rus+kaz+eng";
+    request.fields["ai_check"] = "true";
 
     String subtype = 'octet-stream';
     final name = file.path.toLowerCase();
@@ -72,7 +48,7 @@ class ScanService {
 
     request.files.add(
       await http.MultipartFile.fromPath(
-        "file",
+        "document",
         file.path,
         contentType: MediaType("application", subtype),
       ),
@@ -81,7 +57,7 @@ class ScanService {
     final response = await request.send();
     final body = await response.stream.bytesToString();
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return ScanResult.fromJson(jsonDecode(body));
     } else {
       throw Exception(
@@ -93,27 +69,10 @@ class ScanService {
   /// 3) Создание проверки по тексту
   /// ================================================================
   static Future<ScanResult> createScan(String text) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) {
-      throw Exception("Не найден токен авторизации.");
-    }
-
-    final uri = Uri.parse("$baseUrl/scan/");
-    final res = await http.post(
-      uri,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: jsonEncode({"scanned_text": text}),
+    throw UnsupportedError(
+      "Проверка вставленного текста через mobile backend больше не поддерживается. "
+      "Создайте проверку документом через /api/v1/checks.",
     );
-
-    if (res.statusCode == 200) {
-      return ScanResult.fromJson(jsonDecode(res.body));
-    } else {
-      throw Exception(
-          "Ошибка создания проверки: ${res.statusCode} ${res.body}");
-    }
   }
 
   /// ================================================================
@@ -125,27 +84,19 @@ class ScanService {
       throw Exception("Нет токена авторизации.");
     }
 
-    final uri = Uri.parse("$baseUrl/scan/history");
+    final uri = Uri.parse("$baseUrl/checks");
     final res =
         await http.get(uri, headers: {"Authorization": "Bearer $token"});
 
     if (res.statusCode == 200) {
       final json = jsonDecode(res.body);
-      final items = (json["items"] as List).cast<Map<String, dynamic>>();
+      final rawItems = json is List
+          ? json
+          : (json["results"] ?? json["items"] ?? json["data"] ?? []) as List;
 
-      return items.map((e) {
-        return ScanResult(
-          id: e["id"],
-          aiPercentage: (e["ai_percentage"] as num).toDouble(),
-          scannedText: "",
-          highlightedText: null,
-          createdAt: DateTime.parse(e["created_at"]),
-          aiFragments: const [], // 🔥 КЛЮЧЕВО
-          userScanIndex: e["user_scan_index"],
-          fileName: e["file_name"],
-          authorName: null,
-        );
-      }).toList();
+      return rawItems
+          .map((e) => ScanResult.fromJson(e as Map<String, dynamic>))
+          .toList();
     } else {
       throw Exception("Ошибка истории: ${res.statusCode} ${res.body}");
     }
@@ -160,7 +111,7 @@ class ScanService {
       throw Exception("Нет токена.");
     }
 
-    final uri = Uri.parse("$baseUrl/scan/$id");
+    final uri = Uri.parse("$baseUrl/checks/$id");
     final res =
         await http.get(uri, headers: {"Authorization": "Bearer $token"});
 
@@ -171,5 +122,13 @@ class ScanService {
     } else {
       throw Exception("Ошибка загрузки: ${res.statusCode} ${res.body}");
     }
+  }
+
+  static String _fileTitle(File file) {
+    final path = file.path;
+    final separator = Platform.pathSeparator;
+    final name = path.contains(separator) ? path.split(separator).last : path;
+    final dotIndex = name.lastIndexOf('.');
+    return dotIndex > 0 ? name.substring(0, dotIndex) : name;
   }
 }

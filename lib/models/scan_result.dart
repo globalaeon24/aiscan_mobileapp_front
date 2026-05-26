@@ -52,19 +52,49 @@ class ScanResult {
 
   factory ScanResult.fromJson(Map<String, dynamic> json) {
     final fragmentsJson = json['ai_fragments'] as List<dynamic>? ?? [];
+    final createdAtValue = json['created_at'] ??
+        json['submitted_at'] ??
+        json['completed_at'] ??
+        json['received_at'];
 
     return ScanResult(
-      id: json['id'],
-      userScanIndex: json['user_scan_index'],
-      fileName: json['file_name'],
-      authorName: json['author_name'],
-      aiPercentage: (json['ai_percentage'] as num).toDouble(),
-      scannedText: json['scanned_text'] ?? "",
+      id: _asInt(json['id'] ?? json['core_check_id']),
+      userScanIndex: _asNullableInt(json['user_scan_index']),
+      fileName: json['file_name'] ?? json['document_name'] ?? json['title'],
+      authorName: json['author_name'] ?? json['author'],
+      aiPercentage: _asDouble(
+        json['ai_percentage'] ??
+            json['ai_probability_percent'] ??
+            json['ai_percent'] ??
+            json['originality_percentage'] ??
+            json['originality_percent'] ??
+            0,
+      ),
+      scannedText:
+          json['scanned_text'] ?? json['text'] ?? json['summary'] ?? "",
       highlightedText: json['highlighted_text'],
-      createdAt: DateTime.parse(json['created_at']),
+      createdAt: createdAtValue == null
+          ? DateTime.now()
+          : DateTime.parse(createdAtValue.toString()),
       aiFragments: fragmentsJson
           .map((e) => AiFragment.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
+  }
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static int? _asNullableInt(dynamic value) {
+    if (value == null) return null;
+    return _asInt(value);
+  }
+
+  static double _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0.0;
   }
 }

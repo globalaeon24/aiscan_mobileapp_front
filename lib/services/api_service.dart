@@ -11,7 +11,6 @@ class ApiService {
   /// 🔓 Публичные эндпоинты (НЕ ТРОГАЕМ logout)
   static const List<String> _publicPaths = [
     '/auth/login',
-    '/auth/register',
   ];
 
   // ===================== GET =====================

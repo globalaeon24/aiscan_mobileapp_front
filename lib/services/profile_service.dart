@@ -14,7 +14,7 @@ class ProfileService {
     }
 
     final res = await http.get(
-      Uri.parse("$baseUrl/auth/me"),
+      Uri.parse("$baseUrl/me"),
       headers: {
         "Authorization": "Bearer $token",
       },

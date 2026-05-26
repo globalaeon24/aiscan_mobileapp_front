@@ -18,16 +18,15 @@ class AuthService {
       return true;
     }
 
-    // backend ждёт x-www-form-urlencoded c полями username/password
     final res = await http.post(
       Uri.parse("$baseUrl/auth/login"),
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
       },
-      body: {
-        "username": email,
+      body: jsonEncode({
+        "email": email,
         "password": password,
-      },
+      }),
     );
 
     if (res.statusCode == 200) {
@@ -53,25 +52,8 @@ class AuthService {
     String name,
     String org,
   ) async {
-    final res = await http.post(
-      Uri.parse("$baseUrl/auth/register"),
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "email": email,
-        "password": password,
-        "name": name,
-        "organization_name": org,
-        "agree_privacy": true,
-      }),
-    );
-
-    if (res.statusCode == 200) {
-      // после регистрации сразу логиним
-      return await login(email, password);
-    }
-
+    // Production mobile backend does not own user registration.
+    // Users are created in Oysyn Core, then authenticated through /api/v1/auth/login.
     return false;
   }
 }

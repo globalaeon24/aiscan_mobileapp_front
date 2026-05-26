@@ -6,7 +6,7 @@
 
 | Назначение | Адрес |
 | --- | --- |
-| API мобильного backend | `https://api-mobile.oysyn.asia/api` |
+| API мобильного backend | `https://api-mobile.oysyn.asia/api/v1` |
 | Swagger / OpenAPI backend | `https://api-mobile.oysyn.asia/api/docs` |
 | Healthcheck backend | `https://api-mobile.oysyn.asia/health` |
 | Локальный запуск backend | `http://127.0.0.1:8000` |
@@ -104,14 +104,13 @@ Backend находится в соседней директории `../ai_scan_
 | `database.py` | Подключение к PostgreSQL через `DATABASE_URL` |
 | `auth_service.py` | JWT, регистрация, логин, получение текущего пользователя |
 | `routes/mobile_v1.py` | Новый публичный API для мобильного приложения `/api/v1/*` |
-| `routes/auth.py` | `/api/auth/register`, `/api/auth/login`, `/api/auth/me` |
-| `routes/scan.py` | OCR, проверка текста/файлов, история и детали сканов |
+| `routes/mobile_v1.py` | Production API для мобильного приложения `/api/v1/*` |
 | `services/oysyn_core_client.py` | HTTP-клиент для Oysyn Core Internal API |
 | `services/gpt_zero_service.py` | Интеграция с ZeroGPT / RapidAPI |
 | `services/document_parser.py` | Извлечение текста из документов |
 | `.env` | Локальные секреты и настройки окружения |
 
-Backend на первом этапе выполняет четыре ключевые функции:
+Backend выполняет четыре ключевые функции:
 
 1. Принимает запросы мобильного приложения только через `/api/v1`.
 2. Логинит пользователя через Oysyn Core Internal API и выдает mobile JWT.
