@@ -6,9 +6,9 @@
 
 | Назначение | Адрес |
 | --- | --- |
-| API мобильного backend | `http://194.146.43.172:8082/api` |
-| Swagger / OpenAPI backend | `http://194.146.43.172:8082/api/docs` |
-| Healthcheck backend | `http://194.146.43.172:8082/` |
+| API мобильного backend | `https://api-mobile.oysyn.asia/api` |
+| Swagger / OpenAPI backend | `https://api-mobile.oysyn.asia/api/docs` |
+| Healthcheck backend | `https://api-mobile.oysyn.asia/health` |
 | Локальный запуск backend | `http://127.0.0.1:8000` |
 
 ### Oysyn Internal API
@@ -187,7 +187,7 @@ uvicorn main:app --host 0.0.0.0 --port 8082
 4. Проверить healthcheck:
 
 ```bash
-curl http://194.146.43.172:8082/
+curl https://api-mobile.oysyn.asia/health
 ```
 
 Ожидаемый ответ:

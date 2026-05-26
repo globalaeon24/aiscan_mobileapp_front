@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../config/api_config.dart';
 import '../storage/token_storage.dart';
 
 class AuthService {
-  static const baseUrl = "http://194.146.43.172:8082/api";
+  static const baseUrl = ApiConfig.baseUrl;
   static const _demoUsername = 'oysyn';
   static const _demoPassword = 'qwerty';
   static const _demoToken = 'demo_oysyn_token';

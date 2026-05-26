@@ -2,7 +2,7 @@
 
 ## 1. Mobile Backend API для мобильного приложения
 
-**Base URL:** `http://194.146.43.172:8082/api/v1`
+**Base URL:** `https://api-mobile.oysyn.asia/api/v1`
 
 Для локального запуска:
 

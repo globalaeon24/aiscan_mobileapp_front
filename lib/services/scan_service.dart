@@ -3,11 +3,12 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
+import '../config/api_config.dart';
 import '../storage/token_storage.dart';
 import '../models/scan_result.dart';
 
 class ScanService {
-  static const String baseUrl = "http://194.146.43.172:8082/api";
+  static const String baseUrl = ApiConfig.baseUrl;
 
   /// ================================================================
   /// 1) OCR — отправка изображения на backend
@@ -83,7 +84,8 @@ class ScanService {
     if (response.statusCode == 200) {
       return ScanResult.fromJson(jsonDecode(body));
     } else {
-      throw Exception("Ошибка загрузки документа: ${response.statusCode} $body");
+      throw Exception(
+          "Ошибка загрузки документа: ${response.statusCode} $body");
     }
   }
 
@@ -109,7 +111,8 @@ class ScanService {
     if (res.statusCode == 200) {
       return ScanResult.fromJson(jsonDecode(res.body));
     } else {
-      throw Exception("Ошибка создания проверки: ${res.statusCode} ${res.body}");
+      throw Exception(
+          "Ошибка создания проверки: ${res.statusCode} ${res.body}");
     }
   }
 
@@ -123,7 +126,8 @@ class ScanService {
     }
 
     final uri = Uri.parse("$baseUrl/scan/history");
-    final res = await http.get(uri, headers: {"Authorization": "Bearer $token"});
+    final res =
+        await http.get(uri, headers: {"Authorization": "Bearer $token"});
 
     if (res.statusCode == 200) {
       final json = jsonDecode(res.body);
@@ -157,7 +161,8 @@ class ScanService {
     }
 
     final uri = Uri.parse("$baseUrl/scan/$id");
-    final res = await http.get(uri, headers: {"Authorization": "Bearer $token"});
+    final res =
+        await http.get(uri, headers: {"Authorization": "Bearer $token"});
 
     if (res.statusCode == 200) {
       return ScanResult.fromJson(jsonDecode(res.body));

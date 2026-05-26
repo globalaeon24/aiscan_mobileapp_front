@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../config/api_config.dart';
 import '../storage/token_storage.dart';
 import '../main.dart';
 
 class ApiService {
-  static const baseUrl = "http://194.146.43.172:8082/api";
+  static const baseUrl = ApiConfig.baseUrl;
 
   /// 🔓 Публичные эндпоинты (НЕ ТРОГАЕМ logout)
   static const List<String> _publicPaths = [

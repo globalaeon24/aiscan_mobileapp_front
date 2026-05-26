@@ -62,6 +62,23 @@ FastAPI 127.0.0.1:8000
 
 Для mobile backend используется отдельная база данных.
 
+Mobile Backend DB не должна становиться копией основной БД Oysyn. Пользователи, организации, роли и права являются источником истины в Oysyn Core.
+
+В mobile DB хранятся только локальные мобильные сущности:
+
+- устройства;
+- сессии;
+- push-токены;
+- QR-login;
+- 2FA;
+- мобильные уведомления;
+- статусы мобильных проверок;
+- делегированные действия;
+- админские действия;
+- аудит.
+
+Если в legacy backend-коде есть таблицы или модели `users`, `organizations`, роли или права, их нельзя считать production source of truth. Для production mobile API эти данные должны запрашиваться из Oysyn Core через internal/service-to-service API, а mobile DB должна хранить только мобильный контекст и техническое состояние.
+
 | Переменная | Значение |
 | --- | --- |
 | `DB_NAME` | `aiscan_mobile_db` |
@@ -185,6 +202,42 @@ pip install python-multipart
 python-multipart
 ```
 
+### `ModuleNotFoundError: No module named 'pdfminer'`
+
+Причина: `services/document_parser.py` импортирует `pdfminer.high_level`.
+
+Исправление:
+
+```bash
+cd /opt/oysyn-mobile-backend
+source venv/bin/activate
+pip install pdfminer.six
+```
+
+После установки добавить зависимость в `requirements.txt`:
+
+```text
+pdfminer.six
+```
+
+### `ModuleNotFoundError: No module named 'docx2txt'`
+
+Причина: `services/document_parser.py` импортирует `docx2txt`.
+
+Исправление:
+
+```bash
+cd /opt/oysyn-mobile-backend
+source venv/bin/activate
+pip install docx2txt
+```
+
+После установки добавить зависимость в `requirements.txt`:
+
+```text
+docx2txt
+```
+
 ## Зависимости, которые нужно проверить в backend
 
 Перед production-запуском проанализировать реальные импорты проекта и зафиксировать все нужные пакеты в `requirements.txt`.
@@ -199,9 +252,11 @@ python-dotenv
 psycopg2-binary
 redis
 python-multipart
+pdfminer.six
+docx2txt
 ```
 
-Добавлять только те зависимости, которые реально используются кодом или нужны для подключения к PostgreSQL, Redis, `.env`, JWT, паролям и form-data upload/login.
+Добавлять только те зависимости, которые реально используются кодом или нужны для подключения к PostgreSQL, Redis, `.env`, JWT, паролям, form-data upload/login и парсингу документов.
 
 ## Healthcheck
 
