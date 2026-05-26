@@ -1,16 +1,16 @@
 # ai_scan_text
 
-A new Flutter project.
+Flutter-приложение ScanAI / Oysyn Mobile.
 
-## Getting Started
+## Документация
 
-This project is a starting point for a Flutter application.
+- [Техническая документация](docs/TECHNICAL_DOCUMENTATION.md)
+- [API документация](docs/API_DOCUMENTATION.md)
 
-A few resources to get you started if this is your first Flutter project:
+## Environment
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Секреты, токены и пароли хранятся в `.env` и не коммитятся в git.
+Шаблоны переменных окружения:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Flutter app: `.env.example`
+- Backend: `../ai_scan_text_back/.env.example`
