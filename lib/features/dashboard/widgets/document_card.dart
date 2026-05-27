@@ -14,28 +14,37 @@ class DocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 76,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      constraints: const BoxConstraints(minHeight: 68),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFDDE7F7)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1D4ED8).withValues(alpha: 0.07),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: const Color(0xFFEAF0FF),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: const Color(0xFFDCE7FF)),
             ),
             child: const Icon(
               Icons.insert_drive_file_outlined,
               color: OySynAuthTokens.primaryBlue,
-              size: 29,
+              size: 23,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -46,28 +55,28 @@ class DocumentCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    height: 1.1,
+                    color: Color(0xFF111827),
+                    fontSize: 14,
+                    height: 1.15,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   document.subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 13,
-                    height: 1.1,
-                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6B7280),
+                    fontSize: 12,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _DocumentStatuses(document: document),
         ],
       ),
@@ -127,23 +136,24 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (showDot) ...[
-            Icon(Icons.circle, color: color, size: 10),
-            const SizedBox(width: 6),
+            Icon(Icons.circle, color: color, size: 8),
+            const SizedBox(width: 5),
           ],
           Text(
             text,
             style: TextStyle(
               color: color,
-              fontSize: 13,
+              fontSize: 12,
               height: 1,
               fontWeight: FontWeight.w700,
             ),

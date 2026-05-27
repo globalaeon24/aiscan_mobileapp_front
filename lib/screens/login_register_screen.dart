@@ -267,7 +267,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
 
       if (!mounted) return;
       if (ok) {
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacementNamed(context, '/mobile-intro');
       } else {
         _showError('Ошибка входа. Проверьте данные.');
       }
@@ -323,7 +323,7 @@ class _OySynBrand extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'OySyn',
+          'OySynmobile',
           style: OySynTextStyles.authLogo,
         ),
         const SizedBox(height: 8),

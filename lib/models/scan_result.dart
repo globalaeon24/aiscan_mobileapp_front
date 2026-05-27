@@ -23,6 +23,10 @@ class AiFragment {
 
 class ScanResult {
   final int id;
+  final String? title;
+  final String? status;
+  final String? statusDisplay;
+  final String? documentType;
 
   // 🔥 МЕТАДАННЫЕ
   final int? userScanIndex;
@@ -45,6 +49,10 @@ class ScanResult {
     required this.highlightedText,
     required this.createdAt,
     required this.aiFragments,
+    this.title,
+    this.status,
+    this.statusDisplay,
+    this.documentType,
     this.userScanIndex,
     this.fileName,
     this.authorName,
@@ -59,9 +67,15 @@ class ScanResult {
 
     return ScanResult(
       id: _asInt(json['id'] ?? json['core_check_id']),
+      title: json['title']?.toString(),
+      status: json['status']?.toString(),
+      statusDisplay: json['status_display']?.toString(),
+      documentType: json['document_type_display']?.toString() ??
+          json['document_type']?.toString(),
       userScanIndex: _asNullableInt(json['user_scan_index']),
-      fileName: json['file_name'] ?? json['document_name'] ?? json['title'],
-      authorName: json['author_name'] ?? json['author'],
+      fileName: (json['file_name'] ?? json['document_name'] ?? json['title'])
+          ?.toString(),
+      authorName: (json['author_name'] ?? json['author'])?.toString(),
       aiPercentage: _asDouble(
         json['ai_percentage'] ??
             json['ai_probability_percent'] ??
@@ -72,10 +86,10 @@ class ScanResult {
       ),
       scannedText:
           json['scanned_text'] ?? json['text'] ?? json['summary'] ?? "",
-      highlightedText: json['highlighted_text'],
+      highlightedText: json['highlighted_text']?.toString(),
       createdAt: createdAtValue == null
           ? DateTime.now()
-          : DateTime.parse(createdAtValue.toString()),
+          : (DateTime.tryParse(createdAtValue.toString()) ?? DateTime.now()),
       aiFragments: fragmentsJson
           .map((e) => AiFragment.fromJson(e as Map<String, dynamic>))
           .toList(),

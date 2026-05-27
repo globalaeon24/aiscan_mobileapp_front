@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'features/main_shell/main_shell.dart';
 import 'theme/app_theme.dart';
 import 'screens/login_register_screen.dart';
+import 'screens/mobile_intro_screen.dart';
 import 'storage/token_storage.dart';
 
 /// 🔴 ГЛОБАЛЬНЫЙ navigatorKey
@@ -36,6 +37,7 @@ class ScanAIApp extends StatelessWidget {
       initialRoute: initialRoute,
       routes: {
         '/login': (_) => const LoginRegisterScreen(),
+        '/mobile-intro': (_) => const MobileIntroScreen(),
         '/home': (_) => const MainShell(),
       },
     );

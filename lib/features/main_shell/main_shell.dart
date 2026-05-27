@@ -6,6 +6,7 @@ import 'pages/documents_page.dart';
 import 'pages/qr_page.dart';
 import 'pages/user_profile_page.dart';
 import 'widgets/main_bottom_nav.dart';
+import '../../theme/app_theme.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -28,7 +29,7 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4FAFD),
+      backgroundColor: OySynAuthTokens.appBackground,
       body: SafeArea(
         bottom: false,
         child: IndexedStack(

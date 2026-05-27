@@ -1,52 +1,74 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_theme.dart';
-import '../data/demo_dashboard_data.dart';
 
 class MonthSummaryCard extends StatelessWidget {
-  const MonthSummaryCard({super.key});
+  final int totalDocuments;
+  final int averageOriginality;
+  final int checksAvailable;
+
+  const MonthSummaryCard({
+    super.key,
+    required this.totalDocuments,
+    required this.averageOriginality,
+    required this.checksAvailable,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
       decoration: BoxDecoration(
-        color: OySynAuthTokens.primaryBlue,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            OySynAuthTokens.deepBlue,
+            OySynAuthTokens.primaryBlue,
+          ],
+        ),
         borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: OySynAuthTokens.primaryBlue.withValues(alpha: 0.26),
+            blurRadius: 26,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Сводка за месяц',
+            'Сводка проверок',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           Row(
-            children: const [
+            children: [
               Expanded(
                 child: _SummaryMetric(
-                  value: '${DemoDashboardData.totalDocuments}',
+                  value: '$totalDocuments',
                   label: 'Всего',
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                 child: _SummaryMetric(
-                  value: '${DemoDashboardData.averageOriginality}%',
+                  value: '$averageOriginality%',
                   label: 'Средний %',
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                 child: _SummaryMetric(
-                  value: '${DemoDashboardData.completedWorks}',
-                  label: 'Прошедших\nработ',
+                  value: '$checksAvailable',
+                  label: 'Доступно\nпроверок',
                 ),
               ),
             ],
@@ -69,11 +91,12 @@ class _SummaryMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 86,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      height: 82,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
+        color: Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -84,9 +107,9 @@ class _SummaryMetric extends StatelessWidget {
             maxLines: 1,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 22,
+              fontSize: 24,
               height: 0.95,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 4),

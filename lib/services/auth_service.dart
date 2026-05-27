@@ -15,6 +15,10 @@ class AuthService {
     final normalizedLogin = email.trim().toLowerCase();
     if (normalizedLogin == _demoUsername && password == _demoPassword) {
       await TokenStorage.saveToken(_demoToken);
+      await TokenStorage.saveUser({
+        "full_name": "Demo User",
+        "email": "oysyn",
+      });
       return true;
     }
 
@@ -32,6 +36,8 @@ class AuthService {
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body);
       final token = data["access_token"];
+      final refreshToken = data["refresh_token"];
+      final user = data["user"];
 
       if (token == null) {
         return false;
@@ -39,6 +45,12 @@ class AuthService {
 
       // КЛЮЧЕВОЙ МОМЕНТ: сохраняем токен
       await TokenStorage.saveToken(token);
+      if (refreshToken != null) {
+        await TokenStorage.saveRefreshToken(refreshToken);
+      }
+      if (user is Map<String, dynamic>) {
+        await TokenStorage.saveUser(user);
+      }
       return true;
     }
 

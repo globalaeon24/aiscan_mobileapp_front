@@ -26,4 +26,25 @@ class ProfileService {
       return {};
     }
   }
+
+  static Future<Map<String, dynamic>> getOrganization(
+      int organizationId) async {
+    final token = await TokenStorage.getToken();
+    if (token == null) {
+      throw Exception("Нет токена авторизации.");
+    }
+
+    final res = await http.get(
+      Uri.parse("$baseUrl/organizations/$organizationId"),
+      headers: {
+        "Authorization": "Bearer $token",
+      },
+    );
+
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    } else {
+      return {};
+    }
+  }
 }

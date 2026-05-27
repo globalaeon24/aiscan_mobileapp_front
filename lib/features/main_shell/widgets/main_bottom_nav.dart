@@ -15,12 +15,19 @@ class MainBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 84,
-      decoration: const BoxDecoration(
+      height: 88,
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
+        border: const Border(
           top: BorderSide(color: Color(0xFFE5EAF3), width: 1),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+            blurRadius: 24,
+            offset: const Offset(0, -10),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
@@ -133,10 +140,22 @@ class _NavItem extends StatelessWidget {
                   ),
                 )
               else
-                Icon(
-                  selected ? selectedIcon : icon,
-                  color: color,
-                  size: 24,
+                Container(
+                  width: 42,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color:
+                        selected ? const Color(0xFFEAF0FF) : Colors.transparent,
+                    border: selected
+                        ? Border.all(color: const Color(0xFFDCE7FF))
+                        : null,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Icon(
+                    selected ? selectedIcon : icon,
+                    color: color,
+                    size: 23,
+                  ),
                 ),
               const SizedBox(height: 4),
               Text(
