@@ -4,8 +4,10 @@ Flutter-приложение ScanAI / Oysyn Mobile.
 
 ## Документация
 
+- [Codex handoff](docs/CODEX_HANDOFF.md)
 - [Техническая документация](docs/TECHNICAL_DOCUMENTATION.md)
 - [API документация](docs/API_DOCUMENTATION.md)
+- [Production backend config](docs/OYSYN_MOBILE_BACKEND_CONFIG_REFERENCE.md)
 
 ## Environment
 

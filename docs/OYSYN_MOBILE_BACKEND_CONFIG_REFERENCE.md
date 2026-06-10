@@ -1,22 +1,25 @@
-# Oysyn / AI Scan Mobile Backend: справочник конфигурации
+# Oysyn / AI Scan Mobile Backend: production config reference
 
-Этот файл фиксирует технические реквизиты production-развертывания backend для мобильного приложения Oysyn / AI Scan.
+Актуально на 2026-06-01. Этот документ фиксирует deployment-контекст backend `aiscan_mobileapp_back`.
 
-Реальные пароли, JWT-секреты, токены и другие секреты нельзя коммитить в GitHub. Они должны храниться только в `.env` на сервере.
+Реальные пароли, JWT-секреты, service tokens и private URLs нельзя коммитить. В репозитории хранить только шаблоны.
 
-## Репозиторий
+## Репозиторий и сервер
 
 | Параметр | Значение |
 | --- | --- |
-| Git repository | `https://github.com/globalaeon24/aiscan_mobileapp_back.git` |
-| Сервер проекта | `192.168.75.103` |
+| Backend repository | `https://github.com/globalaeon24/aiscan_mobileapp_back.git` |
+| Backend local path | `/Users/asyl/FLUTTER/scanAI/ai_scan_text_back` |
+| Production server | `192.168.75.103` |
 | Hostname | `oysyn-mobile-back` |
-| Путь проекта | `/opt/oysyn-mobile-backend` |
+| Project path | `/opt/oysyn-mobile-backend` |
 | Python venv | `/opt/oysyn-mobile-backend/venv` |
 | Production domain | `https://api-mobile.oysyn.asia` |
-| Файл окружения | `/opt/oysyn-mobile-backend/.env` |
+| Production env file | `/opt/oysyn-mobile-backend/.env` |
+| FastAPI entrypoint | `main:app` |
+| FastAPI bind | `127.0.0.1:8000` |
 
-## Сетевая схема
+## Network схема
 
 ```text
 Internet
@@ -40,19 +43,17 @@ Nginx :80
 FastAPI 127.0.0.1:8000
 ```
 
-Важные ограничения:
+Ограничения:
 
-- pfSense не трогать.
-- Внешний Nginx `192.168.75.100` уже настроен и проксирует `api-mobile.oysyn.asia` на `192.168.75.103:80`.
-- SSL выпущен на внешнем Nginx `192.168.75.100`.
-- На внутреннем сервере `192.168.75.103` Nginx должен проксировать `:80` на `127.0.0.1:8000`.
-- FastAPI backend должен слушать только `127.0.0.1:8000`, не `0.0.0.0`.
+- pfSense не менять в рамках обычных backend-задач.
+- Внешний Nginx `192.168.75.100` уже держит SSL и проксирует `api-mobile.oysyn.asia` на `192.168.75.103:80`.
+- На `192.168.75.103` Nginx должен проксировать `:80` на `127.0.0.1:8000`.
+- FastAPI должен слушать localhost, не внешний интерфейс.
 
-## Установлено на сервере `192.168.75.103`
+## Установленные компоненты на `192.168.75.103`
 
 - Python 3.12
-- venv
-- pip
+- venv / pip
 - Git
 - Nginx
 - PostgreSQL
@@ -60,24 +61,7 @@ FastAPI 127.0.0.1:8000
 
 ## PostgreSQL
 
-Для mobile backend используется отдельная база данных.
-
-Mobile Backend DB не должна становиться копией основной БД Oysyn. Пользователи, организации, роли и права являются источником истины в Oysyn Core.
-
-В mobile DB хранятся только локальные мобильные сущности:
-
-- устройства;
-- сессии;
-- push-токены;
-- QR-login;
-- 2FA;
-- мобильные уведомления;
-- статусы мобильных проверок;
-- делегированные действия;
-- админские действия;
-- аудит.
-
-Если в legacy backend-коде есть таблицы или модели `users`, `organizations`, роли или права, их нельзя считать production source of truth. Для production mobile API эти данные должны запрашиваться из Oysyn Core через internal/service-to-service API, а mobile DB должна хранить только мобильный контекст и техническое состояние.
+Mobile Backend использует отдельную PostgreSQL DB:
 
 | Переменная | Значение |
 | --- | --- |
@@ -86,13 +70,25 @@ Mobile Backend DB не должна становиться копией осно
 | `DB_HOST` | `127.0.0.1` |
 | `DB_PORT` | `5432` |
 
-Production `DATABASE_URL` должен лежать только в `/opt/oysyn-mobile-backend/.env`:
+`DATABASE_URL` должен быть только в `/opt/oysyn-mobile-backend/.env`:
 
 ```env
 DATABASE_URL=postgresql://aiscan_mobile_user:<REAL_PASSWORD>@127.0.0.1:5432/aiscan_mobile_db
 ```
 
+Mobile DB хранит только mobile infrastructure state. Она не является копией Core DB и не должна быть source of truth по пользователям, организациям, ролям или паролям.
+
+Миграции Alembic уже есть:
+
+```bash
+cd /opt/oysyn-mobile-backend
+source venv/bin/activate
+alembic upgrade head
+```
+
 ## Redis
+
+Redis планируется для short-lived runtime state:
 
 ```env
 REDIS_URL=redis://127.0.0.1:6379/0
@@ -105,6 +101,8 @@ Redis должен слушать только localhost:
 [::1]:6379
 ```
 
+На текущий момент публичный `/api/v1` proxy-flow Redis не использует, но env уже заложен под QR/2FA/rate-limit/push flows.
+
 ## Минимальный `.env`
 
 Файл:
@@ -113,160 +111,75 @@ Redis должен слушать только localhost:
 /opt/oysyn-mobile-backend/.env
 ```
 
-Шаблон без реальных секретов:
+Шаблон:
 
 ```env
 ENVIRONMENT=production
 DATABASE_URL=postgresql://aiscan_mobile_user:<REAL_PASSWORD>@127.0.0.1:5432/aiscan_mobile_db
 REDIS_URL=redis://127.0.0.1:6379/0
 
-JWT_SECRET_KEY=<REAL_LONG_RANDOM_SECRET>
-# Compatibility with current backend code if auth_service.py expects SECRET_KEY.
-SECRET_KEY=<REAL_LONG_RANDOM_SECRET>
+SECRET_KEY=<jwt-secret-min-32-chars>
+JWT_SECRET_KEY=<same-or-new-jwt-secret-min-32-chars>
+ALGORITHM=HS256
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=30
 
-SMS_CODE_TTL_SECONDS=300
-SMS_RESEND_COOLDOWN_SECONDS=60
-SMS_MAX_ATTEMPTS=5
-SMS_ATTEMPT_WINDOW_SECONDS=600
+OYSYN_CORE_API_URL=<oysyn-core-internal-api-url>
+OYSYN_CORE_SERVICE_TOKEN=<oysyn-core-service-token>
+OYSYN_CORE_API_TIMEOUT=30
+
+# Legacy-compatible aliases still supported by current code:
+MOBILE_BACKEND_SECRET=<same-service-token-if-needed>
+OYSYN_INTERNAL_API_BASE_URL=<same-core-url-if-needed>
+OYSYN_INTERNAL_API_TIMEOUT=30
 ```
 
-## Ручной запуск
+Текущий код читает:
+
+- `JWT_SECRET_KEY` или `SECRET_KEY`;
+- `JWT_ALGORITHM` или `ALGORITHM`;
+- `OYSYN_CORE_API_URL` или `OYSYN_INTERNAL_API_BASE_URL`;
+- `OYSYN_CORE_SERVICE_TOKEN` или `MOBILE_BACKEND_SECRET`;
+- `OYSYN_CORE_API_TIMEOUT` или `OYSYN_INTERNAL_API_TIMEOUT`.
+
+## Backend dependencies
+
+Фактический `requirements.txt`:
+
+```text
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-dotenv
+python-jose[cryptography]
+python-multipart
+pydantic[email]
+requests
+alembic
+```
+
+Не добавлять старые parser/OCR зависимости (`pdfminer.six`, `docx2txt`, Tesseract wrappers) без новой задачи: текущий backend не парсит документы сам, а проксирует upload в Oysyn Core.
+
+## Ручной запуск на сервере
 
 ```bash
 cd /opt/oysyn-mobile-backend
 source venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
 uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-Если точка входа проекта отличается от `main:app`, нужно проверить FastAPI app в структуре backend и заменить команду `uvicorn`.
-
-## Известные ошибки запуска
-
-### `sqlalchemy.exc.ArgumentError: Expected string or URL object, got None`
-
-Причина: `DATABASE_URL` не был загружен или отсутствовал в окружении.
-
-Что проверить:
-
-- существует `/opt/oysyn-mobile-backend/.env`;
-- в `.env` есть `DATABASE_URL`;
-- backend загружает `.env`, например через `python-dotenv`;
-- при отсутствии `DATABASE_URL` код явно падает с понятной ошибкой:
-
-```python
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set")
-```
-
-### `ModuleNotFoundError: No module named 'jose'`
-
-Причина: не установлена зависимость для JWT.
-
-Нужно добавить в `requirements.txt`:
-
-```text
-python-jose[cryptography]
-```
-
-### `RuntimeError: SECRET_KEY is not set or too short (min 32 chars)`
-
-Причина: текущий backend-код в `auth_service.py` ожидает переменную `SECRET_KEY`, а production-шаблон может содержать только `JWT_SECRET_KEY`.
-
-Быстрое исправление на сервере: добавить в `/opt/oysyn-mobile-backend/.env` переменную `SECRET_KEY` длиной минимум 32 символа. Значение может совпадать с `JWT_SECRET_KEY`.
-
-```env
-JWT_SECRET_KEY=<REAL_LONG_RANDOM_SECRET>
-SECRET_KEY=<SAME_REAL_LONG_RANDOM_SECRET>
-```
-
-Более аккуратное исправление в коде: сделать backward-compatible чтение секрета, например `SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY")`, если это не ломает текущую архитектуру.
-
-### `Form data requires "python-multipart" to be installed`
-
-Причина: в routes используются form-data параметры, например `Form(...)`, `File(...)`, `UploadFile` или OAuth2 password form.
-
-Исправление:
+Проверки:
 
 ```bash
-cd /opt/oysyn-mobile-backend
-source venv/bin/activate
-pip install python-multipart
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/api/docs
 ```
 
-После установки добавить зависимость в `requirements.txt`:
-
-```text
-python-multipart
-```
-
-### `ModuleNotFoundError: No module named 'pdfminer'`
-
-Причина: `services/document_parser.py` импортирует `pdfminer.high_level`.
-
-Исправление:
-
-```bash
-cd /opt/oysyn-mobile-backend
-source venv/bin/activate
-pip install pdfminer.six
-```
-
-После установки добавить зависимость в `requirements.txt`:
-
-```text
-pdfminer.six
-```
-
-### `ModuleNotFoundError: No module named 'docx2txt'`
-
-Причина: `services/document_parser.py` импортирует `docx2txt`.
-
-Исправление:
-
-```bash
-cd /opt/oysyn-mobile-backend
-source venv/bin/activate
-pip install docx2txt
-```
-
-После установки добавить зависимость в `requirements.txt`:
-
-```text
-docx2txt
-```
-
-## Зависимости, которые нужно проверить в backend
-
-Перед production-запуском проанализировать реальные импорты проекта и зафиксировать все нужные пакеты в `requirements.txt`.
-
-Минимальный список кандидатов:
-
-```text
-python-jose[cryptography]
-passlib[bcrypt]
-bcrypt
-python-dotenv
-psycopg2-binary
-redis
-python-multipart
-pdfminer.six
-docx2txt
-```
-
-Добавлять только те зависимости, которые реально используются кодом или нужны для подключения к PostgreSQL, Redis, `.env`, JWT, паролям, form-data upload/login и парсингу документов.
-
-## Healthcheck
-
-Если endpoint отсутствует, добавить:
-
-```http
-GET /health
-```
-
-Ожидаемый ответ:
+Ожидаемый health:
 
 ```json
 {"status":"ok"}
@@ -280,7 +193,7 @@ GET /health
 /etc/systemd/system/oysyn-mobile-backend.service
 ```
 
-Ожидаемый service:
+Рекомендуемый service:
 
 ```ini
 [Unit]
@@ -300,9 +213,7 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-Если реальная точка входа FastAPI не `main:app`, заменить `ExecStart` на правильную команду.
-
-Команды после создания или изменения service:
+Команды:
 
 ```bash
 sudo systemctl daemon-reload
@@ -311,7 +222,7 @@ sudo systemctl restart oysyn-mobile-backend
 sudo systemctl status oysyn-mobile-backend
 ```
 
-## Внутренний Nginx `192.168.75.103`
+## Internal Nginx на `192.168.75.103`
 
 Файл:
 
@@ -330,13 +241,12 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:8000;
-
         proxy_http_version 1.1;
 
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header X-Forwarded-Proto $scheme;
 
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
@@ -345,51 +255,131 @@ server {
 }
 ```
 
-Проверка и reload:
+Проверка:
 
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## Проверки после запуска
+## Проверки после deploy
 
-На сервере `192.168.75.103`:
+На сервере:
 
 ```bash
 sudo systemctl status oysyn-mobile-backend
 curl http://127.0.0.1:8000/health
 curl http://192.168.75.103/health
+```
+
+Снаружи:
+
+```bash
 curl https://api-mobile.oysyn.asia/health
+curl https://api-mobile.oysyn.asia/api/docs
 ```
 
-Ожидаемый внешний ответ:
+Минимальная функциональная проверка:
 
-```json
-{"status":"ok"}
+```bash
+curl -sS -X POST https://api-mobile.oysyn.asia/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"<REAL_USER_EMAIL>","password":"<REAL_PASSWORD>"}'
 ```
 
-## Рабочий чеклист backend-задачи
+Не вставлять реальные credentials в docs, shell history shared logs или git.
 
-1. Проанализировать структуру backend-проекта.
-2. Проверить `requirements.txt`.
-3. Добавить недостающие зависимости по реальным импортам.
-4. Проверить загрузку `.env`.
-5. Добавить явную ошибку `RuntimeError("DATABASE_URL is not set")`, если `DATABASE_URL` отсутствует.
-6. Проверить точку входа FastAPI и команду `uvicorn`.
-7. Добавить `/health`, если endpoint отсутствует.
-8. Проверить подключение к PostgreSQL через `DATABASE_URL`.
-9. Не добавлять Alembic без необходимости, если в проекте нет миграций.
-10. Добиться стабильного ручного запуска.
-11. Подготовить и запустить systemd service.
-12. Настроить внутренний Nginx `192.168.75.103`.
-13. Не менять pfSense и внешний Nginx `192.168.75.100`, если HTTPS уже работает.
+## Частые ошибки
 
-## Финальная цель
+### `RuntimeError: DATABASE_URL is not set`
 
-- FastAPI backend стабильно запущен через systemd.
-- Backend слушает `127.0.0.1:8000`.
-- Внутренний Nginx `192.168.75.103` проксирует на `127.0.0.1:8000`.
-- `https://api-mobile.oysyn.asia/health` возвращает `{"status":"ok"}`.
-- Все зависимости зафиксированы в `requirements.txt`.
-- Секреты не попадают в GitHub.
+Причина: `DATABASE_URL` не загружен.
+
+Проверить:
+
+- существует `/opt/oysyn-mobile-backend/.env`;
+- systemd service использует `EnvironmentFile`;
+- в `.env` нет кавычек/невидимых символов;
+- процесс перезапущен после изменения env.
+
+### `SECRET_KEY is not set or too short`
+
+Текущий backend требует secret минимум 32 символа. Можно задать оба имени:
+
+```env
+JWT_SECRET_KEY=<REAL_LONG_RANDOM_SECRET>
+SECRET_KEY=<REAL_LONG_RANDOM_SECRET>
+```
+
+### `Oysyn Core API env variables are missing`
+
+Не настроены Core URL/token.
+
+Проверить:
+
+```env
+OYSYN_CORE_API_URL=<oysyn-core-internal-api-url>
+OYSYN_CORE_SERVICE_TOKEN=<service-token>
+```
+
+или legacy aliases:
+
+```env
+OYSYN_INTERNAL_API_BASE_URL=<oysyn-core-internal-api-url>
+MOBILE_BACKEND_SECRET=<service-token>
+```
+
+### `Form data requires "python-multipart" to be installed`
+
+Установить и зафиксировать зависимость:
+
+```bash
+pip install python-multipart
+```
+
+Сейчас `python-multipart` уже есть в `requirements.txt`.
+
+### `No module named 'jose'`
+
+Установить:
+
+```bash
+pip install 'python-jose[cryptography]'
+```
+
+Сейчас зависимость уже есть в `requirements.txt`.
+
+### Core API возвращает 401/403
+
+Проверить service token и заголовки:
+
+```http
+Authorization: Bearer <OYSYN_CORE_SERVICE_TOKEN>
+X-Mobile-User-Id: <core-user-id>
+```
+
+Для login `X-Mobile-User-Id` не нужен.
+
+## Deploy checklist
+
+1. Pull backend repo on `192.168.75.103`.
+2. Activate venv.
+3. `pip install -r requirements.txt`.
+4. Проверить `/opt/oysyn-mobile-backend/.env`.
+5. `alembic upgrade head`.
+6. `sudo systemctl restart oysyn-mobile-backend`.
+7. `sudo systemctl status oysyn-mobile-backend`.
+8. Проверить local health.
+9. Проверить Nginx health.
+10. Проверить external health.
+11. Проверить `/api/docs`.
+12. Проверить login реальным Core-пользователем.
+
+## Что не делать без отдельного решения
+
+- Не менять pfSense.
+- Не менять внешний Nginx `192.168.75.100`, если HTTPS уже работает.
+- Не открывать FastAPI на `0.0.0.0`.
+- Не хранить Core users/passwords/roles как source of truth в mobile DB.
+- Не коммитить `.env`.
+- Не вшивать service token во Flutter.
