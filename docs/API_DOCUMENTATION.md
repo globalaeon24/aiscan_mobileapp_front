@@ -130,6 +130,133 @@ Response 200:
 
 Фактическая форма `user` зависит от Oysyn Core.
 
+### QR-login endpoints
+
+QR-авторизация веб-сессии через мобильное приложение. Для production Oysyn Core flow сайт генерирует QR и кладет в него `token` UUID. Мобильное приложение сканирует token и вызывает Mobile Backend approve endpoint, а Mobile Backend подтверждает вход в Oysyn Core через internal `POST /auth/qr-confirm`.
+
+Поддерживаемые payload в QR:
+
+```json
+{
+  "token": "22ea4fa6-461e-4810-a218-f52949c4bb80"
+}
+```
+
+Также поддерживаются plain token и URL с `token`, `qr_token` или `qrToken`.
+
+Local QR-session endpoints ниже остаются совместимыми для собственного mobile backend flow. В local flow raw `qr_token` возвращается только при создании сессии и не хранится в БД, backend сохраняет только SHA-256 hash.
+
+#### POST `/qr-login/sessions`
+
+Публичный endpoint для веба. Создает короткоживущую QR-сессию.
+
+Request:
+
+```json
+{
+  "web_session_id": "optional-web-session-id"
+}
+```
+
+Response 200:
+
+```json
+{
+  "qr_token": "<raw-token-for-qr>",
+  "status": "pending",
+  "expires_at": "2026-06-10T12:00:00Z"
+}
+```
+
+#### GET `/qr-login/sessions/{qr_token}/status`
+
+Публичный endpoint для веба. Возвращает текущий статус QR-сессии.
+
+Response 200:
+
+```json
+{
+  "status": "pending",
+  "expires_at": "2026-06-10T12:00:00Z",
+  "approved_at": null,
+  "rejected_at": null,
+  "consumed_at": null
+}
+```
+
+Статусы: `pending`, `approved`, `rejected`, `expired`, `consumed`.
+
+#### POST `/qr-login/sessions/{qr_token}/approve`
+
+Приватный endpoint мобильного приложения. Подтверждает вход в веб по отсканированному QR.
+
+Если `qr_token` не найден в local `qr_login_sessions`, Mobile Backend считает его Oysyn Core token и вызывает Core `POST /auth/qr-confirm` с `X-Mobile-User-Id`.
+
+Headers:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+Request:
+
+```json
+{
+  "device_id": "optional-device-id"
+}
+```
+
+Response 200:
+
+```json
+{
+  "status": "confirmed"
+}
+```
+
+#### POST `/qr-login/sessions/{qr_token}/reject`
+
+Приватный endpoint мобильного приложения. Отклоняет вход в веб.
+
+Oysyn Core API на текущий момент не имеет endpoint для reject/status update. Поэтому для Core QR token reject не отправляется в Core; mobile backend возвращает `rejected`, а веб-сессия Core истекает по TTL.
+
+Headers:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+Response 200:
+
+```json
+{
+  "status": "rejected"
+}
+```
+
+#### POST `/qr-login/sessions/{qr_token}/consume`
+
+Публичный endpoint для веба. Одноразово переводит подтвержденную QR-сессию в `consumed`.
+
+Response 200:
+
+```json
+{
+  "status": "consumed",
+  "expires_at": "2026-06-10T12:00:00Z",
+  "approved_at": "2026-06-10T11:59:10Z",
+  "rejected_at": null,
+  "consumed_at": "2026-06-10T11:59:12Z"
+}
+```
+
+Ошибки:
+
+- `404` - QR-сессия не найдена;
+- `409` - QR-сессия уже в другом статусе;
+- `410` - QR-сессия истекла;
+- `401` - mobile approve/reject вызван без валидного mobile JWT.
+
 ### GET `/me`
 
 Возвращает профиль текущего пользователя из Oysyn Core.
@@ -430,7 +557,6 @@ X-Mobile-User-Id: <core-user-id>
 - refresh/logout/revoke sessions;
 - device registration/update;
 - push token registration;
-- QR login scan/approve/reject;
 - 2FA challenge/verify;
 - notifications list/read;
 - app settings/preferences;
