@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../storage/token_storage.dart';
 import '../../../theme/app_theme.dart';
 import '../../../services/profile_service.dart';
+import '../../../services/security_service.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -70,6 +71,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   Future<void> _logout(BuildContext context) async {
     await TokenStorage.clear();
+    await SecurityService.clear();
     if (!context.mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
   }
@@ -222,6 +224,19 @@ class _ProfileContent extends StatelessWidget {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
           ),
+          child: _ProfileMenuItem(
+            icon: Icons.devices_rounded,
+            title: 'Связанные устройства',
+            subtitle: 'Веб-сессии, открытые через QR',
+            onTap: () => Navigator.of(context).pushNamed('/linked-devices'),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Column(
             children: [
               _ProfileField(
@@ -325,6 +340,62 @@ class _ProfileField extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProfileMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ProfileMenuItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF0FF),
+          borderRadius: BorderRadius.circular(21),
+        ),
+        child: Icon(icon, color: OySynAuthTokens.primaryBlue, size: 23),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: OySynAuthTokens.textDark,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 3),
+        child: Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: OySynAuthTokens.textMuted,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        color: OySynAuthTokens.iconGrey,
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 import '../storage/token_storage.dart';
 import '../main.dart';
+import 'security_service.dart';
 
 class ApiService {
   static const baseUrl = ApiConfig.baseUrl;
@@ -76,6 +77,7 @@ class ApiService {
     print("🔥 FORCE LOGOUT");
 
     await TokenStorage.clear();
+    await SecurityService.clear();
 
     navigatorKey.currentState?.pushNamedAndRemoveUntil(
       '/login',

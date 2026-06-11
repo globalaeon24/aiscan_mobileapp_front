@@ -41,9 +41,10 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen>
     setState(() => loading = false);
 
     if (ok && mounted) {
-      Navigator.pushReplacementNamed(context, "/home");
+      Navigator.pushReplacementNamed(context, "/security-setup");
     } else {
-      _showError("Ошибка входа. Проверьте данные.");
+      _showError(
+          AuthService.lastLoginError ?? "Ошибка входа. Проверьте данные.");
     }
   }
 
@@ -70,7 +71,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen>
     setState(() => loading = false);
 
     if (ok && mounted) {
-      Navigator.pushReplacementNamed(context, "/home");
+      Navigator.pushReplacementNamed(context, "/security-setup");
     } else {
       _showError("Ошибка регистрации.");
     }
@@ -172,8 +173,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen>
           TextField(
             controller: regPass2Ctrl,
             obscureText: true,
-            decoration:
-                const InputDecoration(labelText: "Повторите пароль"),
+            decoration: const InputDecoration(labelText: "Повторите пароль"),
           ),
           const SizedBox(height: 12),
 
@@ -185,8 +185,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen>
                 onChanged: (v) => setState(() => agree = v ?? false),
               ),
               const Expanded(
-                child: Text(
-                    "Я согласен с политикой конфиденциальности"),
+                child: Text("Я согласен с политикой конфиденциальности"),
               ),
             ],
           ),

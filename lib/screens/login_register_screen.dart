@@ -267,9 +267,10 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
 
       if (!mounted) return;
       if (ok) {
-        Navigator.pushReplacementNamed(context, '/mobile-intro');
+        Navigator.pushReplacementNamed(context, '/security-setup');
       } else {
-        _showError('Ошибка входа. Проверьте данные.');
+        _showError(
+            AuthService.lastLoginError ?? 'Ошибка входа. Проверьте данные.');
       }
     } finally {
       if (mounted) setState(() => _loginLoading = false);
@@ -290,7 +291,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
 
       if (!mounted) return;
       if (ok) {
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacementNamed(context, '/security-setup');
       } else {
         _showError('Ошибка регистрации.');
       }

@@ -49,6 +49,9 @@ dependencies:
   google_fonts: ^6.2.1
   camera: ^0.11.0+1
   mobile_scanner: ^7.2.0
+  local_auth: ^3.0.1
+  crypto: ^3.0.7
+  flutter_secure_storage: ^10.3.1
 
 dev_dependencies:
   flutter_test:

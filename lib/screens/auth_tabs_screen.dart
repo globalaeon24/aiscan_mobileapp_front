@@ -93,25 +93,30 @@ class _AuthTabsScreenState extends State<AuthTabsScreen>
         ),
         const SizedBox(height: 24),
         FilledButton(
-          onPressed: loading ? null : () async {
-            setState(() => loading = true);
-            final ok = await AuthService.login(
-              emailLoginCtrl.text,
-              passLoginCtrl.text,
-            );
-            setState(() => loading = false);
+          onPressed: loading
+              ? null
+              : () async {
+                  setState(() => loading = true);
+                  final ok = await AuthService.login(
+                    emailLoginCtrl.text,
+                    passLoginCtrl.text,
+                  );
+                  if (!context.mounted) return;
+                  setState(() => loading = false);
 
-            if (ok && mounted) {
-              Navigator.pushReplacementNamed(context, "/home");
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Ошибка входа")),
-              );
-            }
-          },
-          child: loading
-              ? const CircularProgressIndicator()
-              : const Text("Войти"),
+                  if (ok) {
+                    Navigator.pushReplacementNamed(context, "/security-setup");
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text(AuthService.lastLoginError ?? "Ошибка входа"),
+                      ),
+                    );
+                  }
+                },
+          child:
+              loading ? const CircularProgressIndicator() : const Text("Войти"),
         ),
       ],
     );
@@ -144,7 +149,6 @@ class _AuthTabsScreenState extends State<AuthTabsScreen>
             obscureText: true,
           ),
           const SizedBox(height: 12),
-
           Row(
             children: [
               Checkbox(
@@ -161,9 +165,7 @@ class _AuthTabsScreenState extends State<AuthTabsScreen>
               )
             ],
           ),
-
           const SizedBox(height: 24),
-
           FilledButton(
             onPressed: loading
                 ? null
@@ -188,10 +190,12 @@ class _AuthTabsScreenState extends State<AuthTabsScreen>
                       "Пользователь",
                       "",
                     );
+                    if (!context.mounted) return;
                     setState(() => loading = false);
 
-                    if (ok && mounted) {
-                      Navigator.pushReplacementNamed(context, "/home");
+                    if (ok) {
+                      Navigator.pushReplacementNamed(
+                          context, "/security-setup");
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Ошибка регистрации")),
