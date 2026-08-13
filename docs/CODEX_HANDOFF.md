@@ -1,88 +1,56 @@
 # Codex handoff: ScanAI / Oysyn Mobile
 
-Актуально на 2026-06-01. Прочитай этот файл первым, затем `TECHNICAL_DOCUMENTATION.md`, `API_DOCUMENTATION.md`, `OYSYN_MOBILE_BACKEND_CONFIG_REFERENCE.md` и `../ai_scan_text_back/docs/mobile_backend_db_schema.md`.
+Актуально на 2026-08-10. Этот файл — короткая точка входа; затем читать `TECHNICAL_DOCUMENTATION.md`, `API_DOCUMENTATION.md`, `OYSYN_MOBILE_BACKEND_CONFIG_REFERENCE.md` и `../ai_scan_text_back/docs/mobile_backend_db_schema.md`.
 
-## Суть проекта
+## Состояние проекта
 
-Flutter app `ai_scan_text` работает с FastAPI backend `../ai_scan_text_back`. Публичный API для приложения только один: `https://api-mobile.oysyn.asia/api/v1`.
+Flutter app `ai_scan_text` работает только с FastAPI Mobile Backend `../ai_scan_text_back` по `https://api-mobile.oysyn.asia/api/v1`.
 
-Mobile Backend не является владельцем пользователей, организаций, ролей, баланса проверок и отчетов. Он выпускает mobile JWT и проксирует запросы в Oysyn Core Internal API через service token.
+Oysyn Core — источник истины по пользователям, организациям, ролям, балансу проверок, документам и отчётам. Mobile Backend выпускает свой access JWT, хранит mobile-инфраструктуру в отдельной PostgreSQL БД и проксирует бизнес-операции в Core через service token.
 
-## Что важно не перепутать
+Последний завершённый функциональный этап: QR-подтверждение веб-входа и просмотр/отзыв подключённых веб-устройств из профиля мобильного приложения.
 
-- Старые `/api/auth/*` и `/api/scan/*` удалены из целевой архитектуры приложения.
-- Регистрация пользователей в мобильном backend не реализуется: пользователи создаются в Oysyn Core.
-- Проверка текста через paste и отдельный OCR image endpoint отключены на Flutter-стороне.
-- Единственный production upload flow: `POST /api/v1/checks` multipart document upload.
-- Mobile DB уже спроектирована, но текущие `/api/v1` endpoints почти не пишут в нее.
-- Refresh token сейчас возвращается клиенту, но полноценного refresh/logout/session revoke flow еще нет.
+## Что реализовано
+
+- Login через Core, выпуск mobile access JWT и создание записи `mobile_sessions` с SHA-256 hash refresh-токена.
+- Профиль, организация, проверки документов, отчёты и PDF через `/api/v1/*` proxy API.
+- QR-flow: локальные QR-сессии (`create/status/approve/reject/consume`) с аудитом в PostgreSQL; неизвестный local token подтверждается в Oysyn Core через `/auth/qr-confirm`.
+- Экран подключённых устройств: `GET /sessions/devices` получает сессии из Core и кэширует нормализованное представление в `linked_device_sessions`; `POST /sessions/devices/{id}/revoke` отзывает Core-сессию.
+- Alembic migrations `001`–`007`, включая `linked_device_sessions` и поля user-agent.
+
+## Что пока не реализовано или требует hardening
+
+- Нет `/auth/refresh`, `/auth/logout` и управления mobile-сессиями: refresh-токен сохраняется, но не используется; access JWT нельзя отозвать до `exp`.
+- Metadata из `LoginRequest` не записывается в `mobile_devices` / `push_tokens`.
+- Нет 2FA, push-уведомлений, настроек и admin/delegation API.
+- В Flutter есть demo-login `oysyn / qwerty`; токены хранятся в `SharedPreferences`; API URL жёстко задан без flavor/env.
+- CORS открыт (`allow_origins=["*"]`), автотестов нет. Upload сейчас читает файл в память и вызывает синхронный `requests` из async endpoint.
+
+## Важные ограничения
+
+- Не возвращать legacy `/api/auth/*` и `/api/scan/*` в приложение.
+- Не добавлять регистрацию пользователей или хранение Core-паролей в Mobile Backend.
+- Не передавать в Flutter service token, DB password или JWT secret.
+- Для production QR Core не поддерживает reject/status update: reject неизвестного local token возвращает локальный результат, Core-сессия истекает по своему TTL.
 
 ## Где смотреть код
 
-Frontend:
+- Flutter: `lib/services/auth_service.dart`, `lib/services/qr_login_service.dart`, `lib/services/linked_devices_service.dart`, `lib/storage/token_storage.dart`, `lib/features/main_shell/`.
+- Backend: `routes/mobile_v1.py`, `services/oysyn_core_client.py`, `mobile_models.py`, `alembic/versions/`.
 
-- `lib/config/api_config.dart` - production base URL.
-- `lib/services/auth_service.dart` - login, сохранение token/user.
-- `lib/services/scan_service.dart` - upload/history/details.
-- `lib/storage/token_storage.dart` - SharedPreferences keys.
-- `lib/features/main_shell/*` - основной UI.
+## Ближайший план
 
-Backend:
+1. Реализовать refresh/logout/revoke mobile sessions с ротацией refresh-токена.
+2. Добавить регистрацию и обновление mobile device/push metadata.
+3. Провести production hardening: secure storage, убрать demo-login, сузить CORS, лимиты/rate-limit и потоковая передача upload.
+4. Добавить тесты QR, сессий, прав доступа и Core API contract.
+5. Добавить Flutter flavor/env для local и production API.
 
-- `main.py` - app, CORS, health, router.
-- `routes/mobile_v1.py` - public mobile API.
-- `services/oysyn_core_client.py` - Core API adapter.
-- `database.py` - DB engine, hard-fails without `DATABASE_URL`.
-- `mobile_models.py` - local mobile infrastructure models.
-- `alembic/versions/*.py` - migrations.
-- `docs/mobile_backend_db_schema.md` - DB schema contract.
-
-## Текущий API
-
-Mobile endpoints:
-
-- `POST /api/v1/auth/login`
-- `GET /api/v1/auth/verify`
-- `GET /api/v1/me`
-- `GET /api/v1/organizations/{organization_id}`
-- `GET /api/v1/checks`
-- `POST /api/v1/checks`
-- `GET /api/v1/checks/{check_id}`
-- `GET /api/v1/checks/{check_id}/report`
-- `GET /api/v1/checks/{check_id}/report/pdf/{report_type}`
-
-Allowed PDF report types:
-
-- `full_report`
-- `short_report`
-- `certificate`
-- `ai_certificate`
-
-## Следующие логичные задачи
-
-1. Реализовать refresh/logout/revoke sessions с записью `mobile_sessions`.
-2. Использовать device metadata из `LoginRequest`: `mobile_devices`, `push_tokens`, `last_seen_at`.
-3. Добавить QR login endpoints поверх `qr_login_sessions` и `qr_login_events`.
-4. Добавить 2FA endpoints и Redis-backed code storage.
-5. Добавить push notification registration/list/read.
-6. Сделать Flutter flavor/env переключение production/local base URL.
-7. Убрать или спрятать demo-login, если начинается production QA.
-8. Сузить CORS перед финальным hardening.
-
-## Проверки перед сдачей изменений
-
-Backend:
+## Проверки
 
 ```bash
-cd /Users/asyl/FLUTTER/scanAI/ai_scan_text_back
-python -m compileall .
+cd /Users/asyl/FLUTTER/scanAI/ai_scan_text && flutter analyze
+cd /Users/asyl/FLUTTER/scanAI/ai_scan_text_back && PYTHONPYCACHEPREFIX=/private/tmp/scanai-pycache python3 -m compileall -q .
 ```
 
-Flutter:
-
-```bash
-cd /Users/asyl/FLUTTER/scanAI/ai_scan_text
-flutter analyze
-```
-
-Если меняешь API contract, обнови `docs/API_DOCUMENTATION.md`. Если меняешь DB schema, обнови `../ai_scan_text_back/docs/mobile_backend_db_schema.md`. Если меняешь deployment/env, обнови `docs/OYSYN_MOBILE_BACKEND_CONFIG_REFERENCE.md`.
+При изменении API обновлять `docs/API_DOCUMENTATION.md`; при миграциях — `../ai_scan_text_back/docs/mobile_backend_db_schema.md`; при env/deployment — `docs/OYSYN_MOBILE_BACKEND_CONFIG_REFERENCE.md`.

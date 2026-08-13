@@ -1,6 +1,6 @@
 # ScanAI / Oysyn Mobile: API документация
 
-Актуально на 2026-06-01. Мобильное приложение должно вызывать только Mobile Backend API `/api/v1/*`.
+Актуально на 2026-08-10. Мобильное приложение должно вызывать только Mobile Backend API `/api/v1/*`.
 
 ## Base URL
 
@@ -44,7 +44,7 @@ Response:
 Authorization: Bearer <access_token>
 ```
 
-Текущий refresh token важно понимать правильно: клиент его сохраняет, backend его возвращает, но refresh/revoke endpoints пока не реализованы.
+При login backend создаёт запись `mobile_sessions` и хранит только SHA-256 hash refresh token. Клиент сохраняет raw token, но `/auth/refresh`, `/auth/logout` и mobile session revoke пока не реализованы: refresh token пока не используется, а access JWT действителен до `exp`.
 
 ## Mobile Backend Public API
 
@@ -73,7 +73,7 @@ Content-Type: application/json
 }
 ```
 
-Минимально обязательны только `email` и `password`. Device/push поля уже есть в схеме запроса, но сейчас не сохраняются в mobile DB.
+Минимально обязательны только `email` и `password`. Backend создаёт technical `mobile_users` record и `mobile_sessions`; device/push поля уже есть в схеме запроса, но пока не синхронизируются в `mobile_devices` и `push_tokens`.
 
 Response 200:
 
@@ -129,6 +129,63 @@ Response 200:
 ```
 
 Фактическая форма `user` зависит от Oysyn Core.
+
+### GET `/sessions/devices`
+
+Возвращает подключённые веб-устройства текущего пользователя. Backend получает исходные сессии из Oysyn Core, нормализует их и кэширует snapshot в `linked_device_sessions`.
+
+Headers:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+Response 200:
+
+```json
+{
+  "items": [
+    {
+      "id": 123,
+      "core_session_id": "123",
+      "device_name": "Chrome",
+      "browser": "Chrome",
+      "browser_version": "126.0",
+      "platform": "macOS",
+      "os_version": "14.5",
+      "device_type": "desktop",
+      "location": null,
+      "ip_address": "203.0.113.10",
+      "status": "active",
+      "first_seen_at": "2026-06-11T10:00:00Z",
+      "last_active_at": "2026-06-11T11:00:00Z",
+      "revoked_at": null
+    }
+  ]
+}
+```
+
+Форма исходного ответа Core может отличаться; backend поддерживает list и wrappers `items`, `results`, `data`, `sessions`, `devices`.
+
+### POST `/sessions/devices/{session_id}/revoke`
+
+Отзывает веб-сессию в Oysyn Core и обновляет локальный cache, если запись уже была получена.
+
+Headers:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+Response 200:
+
+```json
+{
+  "status": "revoked",
+  "session_id": 123,
+  "core": {}
+}
+```
 
 ### QR-login endpoints
 
@@ -529,7 +586,10 @@ X-Mobile-User-Id: <core-user-id>
 | --- | --- | --- |
 | `POST` | `/auth/login` | `POST /api/v1/auth/login` |
 | `GET` | `/auth/verify` | `GET /api/v1/auth/verify` |
+| `POST` | `/auth/qr-confirm` | approve неизвестного local QR token |
 | `GET` | `/users/me` | `GET /api/v1/me` |
+| `GET` | `/sessions/devices` | `GET /api/v1/sessions/devices` |
+| `POST` | `/sessions/devices/{id}/revoke` | `POST /api/v1/sessions/devices/{id}/revoke` |
 | `GET` | `/organizations/{id}` | `GET /api/v1/organizations/{id}` |
 | `GET` | `/checks` | `GET /api/v1/checks` |
 | `POST` | `/checks` | `POST /api/v1/checks` |

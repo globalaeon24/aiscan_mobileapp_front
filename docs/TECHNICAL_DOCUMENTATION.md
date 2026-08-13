@@ -1,6 +1,6 @@
 # ScanAI / Oysyn Mobile: техническая документация
 
-Актуально на 2026-06-01. Этот файл нужен следующему агенту Codex как карта проекта: что уже сделано, где лежит код, какие решения приняты и что нельзя ломать.
+Актуально на 2026-08-10. Этот файл нужен следующему агенту Codex как карта проекта: что уже сделано, где лежит код, какие решения приняты и что нельзя ломать.
 
 ## Коротко о текущем состоянии
 
@@ -67,6 +67,8 @@ Mobile Backend FastAPI
   | /api/v1/checks/{id}
   | /api/v1/checks/{id}/report
   | /api/v1/checks/{id}/report/pdf/{type}
+  | /api/v1/qr-login/sessions/*
+  | /api/v1/sessions/devices/*
   |
   | Authorization: Bearer <OYSYN_CORE_SERVICE_TOKEN>
   | X-Mobile-User-Id: <core user id>
@@ -84,7 +86,7 @@ Mobile Backend создает собственный mobile JWT access token. В
 - `jti` - случайный идентификатор;
 - `exp` - срок действия из `ACCESS_TOKEN_EXPIRE_MINUTES`.
 
-Refresh token сейчас возвращается клиенту как случайная строка, но в текущем `routes/mobile_v1.py` еще не сохраняется в `mobile_sessions` и не имеет refresh endpoint. Это важный незавершенный участок.
+После успешного login backend создаёт `mobile_users` technical record и `mobile_sessions`: в БД записывается только SHA-256 hash случайного refresh token. Raw refresh token возвращается клиенту один раз. Endpoint'ов refresh/logout/revoke именно для mobile-сессий пока нет, поэтому этот token пока не используется, а access JWT нельзя отозвать до истечения `exp`.
 
 ## Flutter app
 
@@ -97,6 +99,8 @@ Refresh token сейчас возвращается клиенту как слу
 | `lib/services/auth_service.dart` | Login через `/auth/login`, сохранение access/refresh token и user snapshot |
 | `lib/services/scan_service.dart` | Upload документа, история, детали проверки |
 | `lib/services/profile_service.dart` | Профиль и организация |
+| `lib/services/qr_login_service.dart` | Разбор QR payload и approve/reject QR-входа |
+| `lib/services/linked_devices_service.dart` | Список и отзыв подключённых веб-устройств |
 | `lib/storage/token_storage.dart` | `SharedPreferences`: access token, refresh token, current user |
 | `lib/models/scan_result.dart` | Адаптер ответа Core/mobile API в UI-модель |
 | `lib/features/main_shell/*` | Новый shell/dashboard/documents/profile UI |
@@ -108,6 +112,7 @@ Refresh token сейчас возвращается клиенту как слу
 - `ScanService.uploadImageForOCR` и `ScanService.createScan(text)` намеренно бросают `UnsupportedError`. Старый OCR/text flow удален; проверка идет через загрузку документа в `/api/v1/checks`.
 - Upload документа отправляет `multipart/form-data` с `title`, `document`, `include_ocr=true`, `ocr_languages=rus+kaz+eng`, `ai_check=true`.
 - История поддерживает ответы вида `{results, count, page}` и запасные варианты `{items}` / `{data}`.
+- В профиле есть переход на `linked_devices_page.dart`: данные берутся из `/sessions/devices`, отзыв — через `/sessions/devices/{id}/revoke`.
 
 ## Mobile Backend
 
@@ -120,7 +125,7 @@ Refresh token сейчас возвращается клиенту как слу
 | `services/oysyn_core_client.py` | Service-to-service HTTP-клиент в Oysyn Core |
 | `database.py` | SQLAlchemy engine/session, требует `DATABASE_URL` |
 | `mobile_models.py` | SQLAlchemy-модели mobile DB |
-| `alembic/versions/*.py` | Миграции 001-005 |
+| `alembic/versions/*.py` | Миграции 001-007 |
 | `docs/mobile_backend_db_schema.md` | Подробная карта mobile DB |
 | `.env.example` | Шаблон production env |
 
@@ -143,7 +148,7 @@ Refresh token сейчас возвращается клиенту как слу
 
 ## Mobile Backend DB
 
-Mobile DB уже спроектирована и описана миграциями Alembic, но текущие публичные `/api/v1` endpoints в `routes/mobile_v1.py` пока почти полностью проксируют Core API и не используют локальные таблицы.
+Mobile DB не дублирует Core. Большинство business endpoints остаются proxy к Core, но login уже пишет `mobile_users`/`mobile_sessions`, QR-flow пишет `qr_login_sessions`/`qr_login_events`, а список web-сессий кэшируется в `linked_device_sessions`.
 
 Назначение mobile DB:
 
@@ -173,6 +178,8 @@ Mobile DB не должна становиться копией Oysyn Core DB. �
 | `003_mobile_checks` | mobile check requests/files/results/status events |
 | `004_mobile_admin` | access delegation, admin actions |
 | `005_mobile_settings_integrations` | settings, preferences, app versions, Core API logs, sync jobs |
+| `006_linked_device_sessions` | кэш сессий устройств из Oysyn Core |
+| `007_linked_ua_fields` | browser version, OS version, device type и user-agent для linked sessions |
 
 Подробности: `../ai_scan_text_back/docs/mobile_backend_db_schema.md`.
 
@@ -288,20 +295,23 @@ Internet
 - JWT secret reading совместим с `JWT_SECRET_KEY` и `SECRET_KEY`.
 - Oysyn Core config совместим с новыми и legacy env names.
 - Добавлен `/health`.
-- Добавлены SQLAlchemy mobile-модели и Alembic migrations 001-005.
+- Добавлены SQLAlchemy mobile-модели и Alembic migrations 001-007.
+- Login создаёт `mobile_sessions` и сохраняет только hash refresh-токена.
+- Реализованы QR local sessions/events и подтверждение Core QR token.
+- Реализованы список и отзыв подключённых устройств из профиля; добавлены migrations 006-007.
 - Добавлен подробный документ схемы mobile DB.
 
 ## Известные незавершенные места
 
-- Refresh token возвращается, но нет endpoint для refresh/logout/revoke и нет записи `mobile_sessions`.
+- Refresh token уже записывается как hash в `mobile_sessions`, но нет endpoint для refresh/logout/revoke; access JWT не проверяется по session status.
 - `LoginRequest` принимает device metadata, но backend пока ее не сохраняет.
-- Mobile DB и Alembic готовы, но текущий `/api/v1` proxy-flow почти не пишет в PostgreSQL.
-- Нет QR-login endpoints, хотя таблицы для QR-flow уже заложены.
+- `mobile_devices` и `push_tokens` пока не используются, а большая часть mobile DB остаётся подготовленной, но не подключённой к API.
 - Нет 2FA endpoints, хотя таблицы для 2FA уже заложены.
 - Нет push notification endpoints, хотя таблицы для push/notifications уже заложены.
 - CORS сейчас открыт `allow_origins=["*"]`; перед production hardening сузить.
 - Demo-login в Flutter может создать ложное ощущение авторизации, если тестировать реальные API.
 - Для локального Flutter backend base URL пока hardcoded, нет flavor/env переключателя.
+- Автоматических тестов для Flutter и backend нет. Upload документа читает файл целиком в память и использует blocking `requests` в async endpoint.
 
 ## Правила для следующего агента
 

@@ -1,6 +1,6 @@
 # Oysyn / AI Scan Mobile Backend: production config reference
 
-Актуально на 2026-06-01. Этот документ фиксирует deployment-контекст backend `aiscan_mobileapp_back`.
+Актуально на 2026-08-10. Этот документ фиксирует deployment-контекст backend `aiscan_mobileapp_back`.
 
 Реальные пароли, JWT-секреты, service tokens и private URLs нельзя коммитить. В репозитории хранить только шаблоны.
 
