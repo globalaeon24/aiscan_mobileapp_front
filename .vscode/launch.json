@@ -2,6 +2,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "OySyn UI Demo",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=APP_ENV=stage",
+        "--dart-define=API_BASE_URL=https://api-mobile-stage.oysyn.asia/api/v1",
+        "--dart-define=ENABLE_DEMO_LOGIN=true",
+        "--dart-define=DEMO_USERNAME=oysyn",
+        "--dart-define=DEMO_PASSWORD=qwerty"
+      ]
+    },
+    {
       "name": "OySyn Stage",
       "request": "launch",
       "type": "dart",

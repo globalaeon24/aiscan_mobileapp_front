@@ -104,8 +104,9 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
             icon: Icons.mail_outline_rounded,
             hintText: 'oysyn@gmail.com',
             keyboardType: TextInputType.emailAddress,
-            validator: (value) =>
-                value == null || value.trim().isEmpty ? 'Введите email' : null,
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Введите email или логин'
+                : null,
           ),
           const SizedBox(height: 14),
           const _AuthLabel('Пароль'),

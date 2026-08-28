@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
@@ -31,18 +32,21 @@ class AuthService {
 
     late final http.Response res;
     try {
-      res = await http.post(
-        Uri.parse("$baseUrl/auth/login"),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode({
-          "email": trimmedEmail,
-          "password": trimmedPassword,
-        }),
-      );
+      res = await http
+          .post(
+            Uri.parse("$baseUrl/auth/login"),
+            headers: {"Content-Type": "application/json"},
+            body: jsonEncode({
+              "email": trimmedEmail,
+              "password": trimmedPassword,
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      lastLoginError = "Сервер отвечает слишком долго. Попробуйте ещё раз.";
+      return false;
     } catch (_) {
-      lastLoginError = "Не удалось подключиться к серверу.";
+      lastLoginError = "Нет связи с сервером. Проверьте интернет-соединение.";
       return false;
     }
 
@@ -85,21 +89,24 @@ class AuthService {
 
   static String _extractErrorMessage(http.Response response) {
     final decoded = _decodeBody(response.body);
-    if (decoded is Map<String, dynamic>) {
-      final detail =
-          decoded["detail"] ?? decoded["error"] ?? decoded["message"];
-      if (detail is String && detail.trim().isNotEmpty) {
-        return detail.trim();
-      }
-      if (detail is Map || detail is List) {
-        return jsonEncode(detail);
-      }
-    }
+    final serverMessage = decoded is Map<String, dynamic>
+        ? (decoded["detail"] ?? decoded["error"] ?? decoded["message"])
+            ?.toString()
+            .toLowerCase()
+        : null;
 
-    if (response.statusCode == 401) {
-      return "Неверный email или пароль.";
-    }
-    return "Ошибка входа. Код: ${response.statusCode}.";
+    return switch (response.statusCode) {
+      400 || 401 => "Неверный логин или пароль.",
+      403 when serverMessage?.contains("заблок") == true =>
+        "Учётная запись заблокирована. Обратитесь к администратору.",
+      403 => "Вход для этой учётной записи ограничен.",
+      404 => "Сервис авторизации временно недоступен.",
+      408 => "Сервер отвечает слишком долго. Попробуйте ещё раз.",
+      422 => "Проверьте, что логин и пароль заполнены правильно.",
+      429 => "Слишком много попыток входа. Повторите немного позже.",
+      >= 500 => "Сервис временно недоступен. Попробуйте позже.",
+      _ => "Не удалось войти. Попробуйте ещё раз.",
+    };
   }
 
   static Future<bool> register(
