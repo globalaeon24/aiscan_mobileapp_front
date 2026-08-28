@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../config/api_config.dart';
 import '../storage/token_storage.dart';
 import '../models/scan_result.dart';
+import '../models/check_report.dart';
 
 class CheckHistoryPage {
   final List<ScanResult> items;
@@ -47,7 +49,15 @@ class ScanService {
   /// ================================================================
   /// 2) Загрузка документа и проверка
   /// ================================================================
-  static Future<ScanResult> uploadDocumentForScan(File file) async {
+  static Future<ScanResult> uploadDocumentForScan(
+    File file, {
+    String? title,
+    String? author,
+    String? department,
+    String? documentType,
+    bool includeOcr = false,
+    bool aiCheck = true,
+  }) async {
     final token = await TokenStorage.getToken();
     if (token == null) {
       throw Exception("Нет токена авторизации.");
@@ -56,25 +66,45 @@ class ScanService {
     final uri = Uri.parse("$baseUrl/checks");
     final request = http.MultipartRequest("POST", uri);
     request.headers["Authorization"] = "Bearer $token";
-    request.fields["title"] = _fileTitle(file);
-    request.fields["include_ocr"] = "true";
+    request.fields["title"] =
+        title == null || title.trim().isEmpty ? _fileTitle(file) : title.trim();
+    request.fields["include_ocr"] = includeOcr.toString();
     request.fields["ocr_languages"] = "rus+kaz+eng";
-    request.fields["ai_check"] = "true";
+    request.fields["ai_check"] = aiCheck.toString();
+    if (author != null && author.trim().isNotEmpty) {
+      request.fields["author"] = author.trim();
+    }
+    if (department != null && department.trim().isNotEmpty) {
+      request.fields["department"] = department.trim();
+    }
+    if (documentType != null && documentType.isNotEmpty) {
+      request.fields["document_type"] = documentType;
+    }
 
-    String subtype = 'octet-stream';
+    var mediaType = MediaType('application', 'octet-stream');
     final name = file.path.toLowerCase();
 
-    if (name.endsWith('.pdf')) subtype = 'pdf';
-    if (name.endsWith('.docx')) {
-      subtype = 'vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (name.endsWith('.pdf')) {
+      mediaType = MediaType('application', 'pdf');
     }
-    if (name.endsWith('.doc')) subtype = 'msword';
+    if (name.endsWith('.docx')) {
+      mediaType = MediaType(
+        'application',
+        'vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+    }
+    if (name.endsWith('.doc')) {
+      mediaType = MediaType('application', 'msword');
+    }
+    if (name.endsWith('.txt')) {
+      mediaType = MediaType('text', 'plain');
+    }
 
     request.files.add(
       await http.MultipartFile.fromPath(
         "document",
         file.path,
-        contentType: MediaType("application", subtype),
+        contentType: mediaType,
       ),
     );
 
@@ -171,6 +201,40 @@ class ScanService {
     } else {
       throw Exception("Ошибка загрузки: ${res.statusCode} ${res.body}");
     }
+  }
+
+  static Future<CheckReport> getReport(int id) async {
+    final token = await TokenStorage.getToken();
+    if (token == null) throw Exception('Нет токена авторизации.');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/checks/$id/report'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Отчёт пока недоступен: ${response.statusCode}');
+    }
+    return CheckReport.fromJson(jsonDecode(response.body));
+  }
+
+  static Future<Uint8List> getReportPdf(
+    int id, {
+    String reportType = 'certificate',
+    String language = 'ru',
+  }) async {
+    final token = await TokenStorage.getToken();
+    if (token == null) throw Exception('Нет токена авторизации.');
+
+    final uri = Uri.parse('$baseUrl/checks/$id/report/pdf/$reportType')
+        .replace(queryParameters: {'lang': language});
+    final response = await http.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Не удалось получить PDF: ${response.statusCode}');
+    }
+    return response.bodyBytes;
   }
 
   static String _fileTitle(File file) {

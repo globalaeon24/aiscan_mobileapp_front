@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/scan_result.dart';
+import '../../../screens/scan_details_screen.dart';
 import '../../../services/scan_service.dart';
 import '../../../theme/app_theme.dart';
 import '../../dashboard/models/dashboard_document.dart';
@@ -66,6 +67,17 @@ class _DocumentsPageState extends State<DocumentsPage> {
     });
   }
 
+  void _openResult(ScanResult result) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ScanDetailsScreen(
+          result: result,
+          loadFromBackend: true,
+        ),
+      ),
+    );
+  }
+
   List<ScanResult> _filteredItems(List<ScanResult> items) {
     final now = DateTime.now();
     final from =
@@ -92,8 +104,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
       builder: (context, snapshot) {
         final pageData = snapshot.data;
         final filtered = _filteredItems(pageData?.items ?? const []);
-        final documents =
-            filtered.map(DashboardDocument.fromScanResult).toList();
         final isLoading = snapshot.connectionState == ConnectionState.waiting;
 
         return RefreshIndicator(
@@ -127,7 +137,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
               _PageSummary(
                 page: _page,
                 pageData: pageData,
-                visibleCount: documents.length,
+                visibleCount: filtered.length,
               ),
               const SizedBox(height: 12),
               if (snapshot.hasError)
@@ -136,7 +146,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
                   title: 'Не удалось загрузить документы',
                   text: snapshot.error.toString(),
                 )
-              else if (!isLoading && documents.isEmpty)
+              else if (!isLoading && filtered.isEmpty)
                 const _DocumentsMessage(
                   icon: Icons.search_off_rounded,
                   title: 'Проверки не найдены',
@@ -144,8 +154,11 @@ class _DocumentsPageState extends State<DocumentsPage> {
                       'Измени поиск или период, чтобы увидеть больше проверок.',
                 )
               else
-                for (final document in documents) ...[
-                  DocumentCard(document: document),
+                for (final result in filtered) ...[
+                  DocumentCard(
+                    document: DashboardDocument.fromScanResult(result),
+                    onTap: () => _openResult(result),
+                  ),
                   const SizedBox(height: 8),
                 ],
               if (pageData != null && !snapshot.hasError) ...[

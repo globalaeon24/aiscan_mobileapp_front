@@ -4,92 +4,83 @@ import '../../../storage/token_storage.dart';
 import '../../../theme/app_theme.dart';
 
 class DashboardHeader extends StatelessWidget {
-  const DashboardHeader({super.key});
+  final int checksAvailable;
+
+  const DashboardHeader({
+    super.key,
+    required this.checksAvailable,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.96),
-        border: const Border(
-          bottom: BorderSide(color: Color(0xFFE5EAF3)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0FF),
-              borderRadius: BorderRadius.circular(12),
+            width: 30,
+            height: 30,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF3E7BFF), Color(0xFF2F5FE0)],
+              ),
             ),
+            padding: const EdgeInsets.all(4),
             child: Image.asset(OySynAuthTokens.logoAsset),
           ),
-          const SizedBox(width: 10),
-          RichText(
-            text: const TextSpan(
-              text: 'OySyn',
-              style: TextStyle(
-                color: OySynAuthTokens.primaryBlue,
-                fontSize: 22,
-                height: 1,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0,
-              ),
+          const SizedBox(width: 8),
+          const Text(
+            'OySyn',
+            style: TextStyle(
+              color: Color(0xFF2B4CC0),
+              fontSize: 18,
+              height: 1,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF0FF),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                TextSpan(
-                  text: ' mobile',
-                  style: TextStyle(
-                    color: Color(0xFF475569),
-                    fontSize: 14,
+                const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 14,
+                  color: Color(0xFF2B5CE0),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '$checksAvailable',
+                  style: const TextStyle(
+                    color: Color(0xFF2B5CE0),
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
             ),
           ),
-          const Spacer(),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F8FF),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.notifications_none_rounded,
-                color: Color(0xFF18181B),
-                size: 23,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           FutureBuilder<Map<String, dynamic>?>(
             future: TokenStorage.getUser(),
             builder: (context, snapshot) {
               return CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFFEAF0FF),
+                radius: 18,
+                backgroundColor: const Color(0xFF2F5FE0),
                 child: Text(
-                  TokenStorage.initials(snapshot.data),
+                  TokenStorage.initials(snapshot.data).substring(0, 1),
                   style: const TextStyle(
-                    color: OySynAuthTokens.primaryBlue,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               );

@@ -6,9 +6,9 @@ import '../storage/token_storage.dart';
 
 class AuthService {
   static const baseUrl = ApiConfig.baseUrl;
-  static const _demoUsername = 'oysyn';
-  static const _demoPassword = 'qwerty';
-  static const _demoToken = 'demo_oysyn_token';
+  static const _demoEnabled = bool.fromEnvironment('ENABLE_DEMO_LOGIN');
+  static const _demoUsername = String.fromEnvironment('DEMO_USERNAME');
+  static const _demoPassword = String.fromEnvironment('DEMO_PASSWORD');
   static String? lastLoginError;
 
   /// ---------- ЛОГИН ----------
@@ -17,8 +17,11 @@ class AuthService {
     final trimmedEmail = email.trim();
     final trimmedPassword = password.trim();
     final normalizedLogin = trimmedEmail.toLowerCase();
-    if (normalizedLogin == _demoUsername && trimmedPassword == _demoPassword) {
-      await TokenStorage.saveToken(_demoToken);
+    if (_demoEnabled &&
+        _demoUsername.isNotEmpty &&
+        normalizedLogin == _demoUsername.toLowerCase() &&
+        trimmedPassword == _demoPassword) {
+      await TokenStorage.saveToken('demo_oysyn_token');
       await TokenStorage.saveUser({
         "full_name": "Demo User",
         "email": "oysyn",
@@ -58,7 +61,6 @@ class AuthService {
         return false;
       }
 
-      // КЛЮЧЕВОЙ МОМЕНТ: сохраняем токен
       await TokenStorage.saveToken(token);
       if (refreshToken != null) {
         await TokenStorage.saveRefreshToken(refreshToken);
@@ -100,15 +102,13 @@ class AuthService {
     return "Ошибка входа. Код: ${response.statusCode}.";
   }
 
-  /// ---------- РЕГИСТРАЦИЯ ----------
   static Future<bool> register(
     String email,
     String password,
     String name,
-    String org,
+    String organization,
   ) async {
-    // Production mobile backend does not own user registration.
-    // Users are created in Oysyn Core, then authenticated through /api/v1/auth/login.
+    // Accounts are provisioned by an organization administrator in Oysyn Core.
     return false;
   }
 }

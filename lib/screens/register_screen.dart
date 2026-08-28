@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
@@ -22,15 +24,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text("Регистрация", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-
-            TextField(controller: nameCtrl, decoration: InputDecoration(labelText: "Имя")),
-            TextField(controller: emailCtrl, decoration: InputDecoration(labelText: "Email")),
-            TextField(controller: orgCtrl, decoration: InputDecoration(labelText: "Организация")),
-            TextField(controller: passCtrl, decoration: InputDecoration(labelText: "Пароль"), obscureText: true),
-
+            Text("Регистрация",
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(labelText: "Имя")),
+            TextField(
+                controller: emailCtrl,
+                decoration: InputDecoration(labelText: "Email")),
+            TextField(
+                controller: orgCtrl,
+                decoration: InputDecoration(labelText: "Организация")),
+            TextField(
+                controller: passCtrl,
+                decoration: InputDecoration(labelText: "Пароль"),
+                obscureText: true),
             const SizedBox(height: 20),
-
             ElevatedButton(
               onPressed: () async {
                 setState(() => loading = true);
@@ -42,11 +51,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   orgCtrl.text,
                 );
 
+                if (!mounted) return;
                 setState(() => loading = false);
 
-                if (ok) Navigator.pop(context);
+                if (ok && context.mounted) Navigator.pop(context);
               },
-              child: loading ? CircularProgressIndicator() : Text("Создать аккаунт"),
+              child: loading
+                  ? CircularProgressIndicator()
+                  : Text("Создать аккаунт"),
             )
           ],
         ),

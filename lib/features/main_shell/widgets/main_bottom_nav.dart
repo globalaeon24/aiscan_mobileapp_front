@@ -17,7 +17,7 @@ class MainBottomNav extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        height: 88,
+        height: 76,
         decoration: BoxDecoration(
           color: Colors.white,
           border: const Border(
@@ -52,18 +52,18 @@ class MainBottomNav extends StatelessWidget {
             _NavItem(
               index: 2,
               selectedIndex: currentIndex,
-              icon: Icons.qr_code_2_rounded,
-              selectedIcon: Icons.qr_code_2_rounded,
-              label: 'OySyn QR',
+              icon: Icons.add_rounded,
+              selectedIcon: Icons.add_rounded,
+              label: 'Проверить',
               center: true,
               onTap: onChanged,
             ),
             _NavItem(
               index: 3,
               selectedIndex: currentIndex,
-              icon: Icons.fact_check_outlined,
-              selectedIcon: Icons.fact_check_rounded,
-              label: 'Проверить',
+              icon: Icons.qr_code_2_rounded,
+              selectedIcon: Icons.qr_code_2_rounded,
+              label: 'OySyn QR',
               onTap: onChanged,
             ),
             _NavItem(
@@ -110,19 +110,21 @@ class _NavItem extends StatelessWidget {
       child: InkWell(
         onTap: () => onTap(index),
         child: Transform.translate(
-          offset: center ? const Offset(0, -12) : Offset.zero,
+          offset: center ? const Offset(0, -10) : Offset.zero,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (center)
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
-                    color: selected
-                        ? OySynAuthTokens.primaryBlue
-                        : const Color(0xFFEAF0FF),
-                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF3E7BFF), Color(0xFF2F5FE0)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
                         color:
@@ -134,8 +136,7 @@ class _NavItem extends StatelessWidget {
                   ),
                   child: Icon(
                     selected ? selectedIcon : icon,
-                    color:
-                        selected ? Colors.white : OySynAuthTokens.primaryBlue,
+                    color: Colors.white,
                     size: 27,
                   ),
                 )

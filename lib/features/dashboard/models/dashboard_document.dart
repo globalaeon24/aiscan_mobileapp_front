@@ -33,9 +33,10 @@ class DashboardDocument {
 
   factory DashboardDocument.fromScanResult(ScanResult result) {
     final statusType = _statusType(result.status);
-    final originality = result.aiPercentage > 0
-        ? result.aiPercentage.round().clamp(0, 100)
+    final originality = result.originalityPercentage > 0
+        ? result.originalityPercentage.round().clamp(0, 100)
         : null;
+    final ai = result.aiPercentage?.round().clamp(0, 100);
     final author = result.authorName?.trim();
     final date = result.createdAt;
     final dateText =
@@ -53,6 +54,7 @@ class DashboardDocument {
       subtitle: details.join(' · '),
       originalityPercent:
           statusType == DocumentStatusType.success ? originality : null,
+      aiPercent: statusType == DocumentStatusType.success ? ai : null,
       statusText: statusType == DocumentStatusType.success
           ? null
           : (result.statusDisplay ?? _statusLabel(result.status)),

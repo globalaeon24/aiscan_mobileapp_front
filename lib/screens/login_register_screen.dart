@@ -15,27 +15,13 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
   final _loginPass = TextEditingController();
   final _loginKey = GlobalKey<FormState>();
 
-  final _regName = TextEditingController();
-  final _regEmail = TextEditingController();
-  final _regOrg = TextEditingController();
-  final _regPass = TextEditingController();
-  final _regPassRepeat = TextEditingController();
-  final _regKey = GlobalKey<FormState>();
-
   bool _loginLoading = false;
-  bool _regLoading = false;
   bool _passVisible = false;
-  bool _registrationMode = false;
 
   @override
   void dispose() {
     _loginEmail.dispose();
     _loginPass.dispose();
-    _regName.dispose();
-    _regEmail.dispose();
-    _regOrg.dispose();
-    _regPass.dispose();
-    _regPassRepeat.dispose();
     super.dispose();
   }
 
@@ -79,12 +65,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                             SizedBox(height: compact ? 28 : 70),
                             const _OySynBrand(),
                             SizedBox(height: compact ? 36 : 48),
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 220),
-                              child: _registrationMode
-                                  ? _buildRegisterForm()
-                                  : _buildLoginForm(),
-                            ),
+                            _buildLoginForm(),
                             SizedBox(height: compact ? 44 : 120),
                             const Text(
                               'OySyn · v1.0.0',
@@ -151,7 +132,9 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {},
+              onPressed: () => _showError(
+                'Для восстановления пароля обратитесь к администратору.',
+              ),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 minimumSize: const Size(0, 32),
@@ -179,76 +162,9 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
           const SizedBox(height: 30),
           _SecondaryAuthButton(
             text: 'Зарегистрироваться',
-            onPressed: () => setState(() => _registrationMode = true),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRegisterForm() {
-    return Form(
-      key: _regKey,
-      child: Column(
-        key: const ValueKey('register'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _AuthLabel('Имя'),
-          const SizedBox(height: 8),
-          _AuthField(
-            controller: _regName,
-            icon: Icons.person_outline_rounded,
-            validator: (value) =>
-                value == null || value.trim().isEmpty ? 'Введите имя' : null,
-          ),
-          const SizedBox(height: 10),
-          const _AuthLabel('Email'),
-          const SizedBox(height: 8),
-          _AuthField(
-            controller: _regEmail,
-            icon: Icons.mail_outline_rounded,
-            keyboardType: TextInputType.emailAddress,
-            validator: (value) => value == null || !value.contains('@')
-                ? 'Введите корректный email'
-                : null,
-          ),
-          const SizedBox(height: 10),
-          const _AuthLabel('Организация'),
-          const SizedBox(height: 8),
-          _AuthField(
-            controller: _regOrg,
-            icon: Icons.business_outlined,
-          ),
-          const SizedBox(height: 10),
-          const _AuthLabel('Пароль'),
-          const SizedBox(height: 8),
-          _AuthField(
-            controller: _regPass,
-            icon: Icons.lock_outline_rounded,
-            obscureText: true,
-            validator: (value) =>
-                value == null || value.length < 6 ? 'Минимум 6 символов' : null,
-          ),
-          const SizedBox(height: 10),
-          const _AuthLabel('Повторите пароль'),
-          const SizedBox(height: 8),
-          _AuthField(
-            controller: _regPassRepeat,
-            icon: Icons.lock_outline_rounded,
-            obscureText: true,
-            validator: (value) =>
-                value != _regPass.text ? 'Пароли не совпадают' : null,
-          ),
-          const SizedBox(height: 22),
-          _PrimaryAuthButton(
-            text: 'Создать аккаунт',
-            loading: _regLoading,
-            onPressed: _tryRegister,
-          ),
-          const SizedBox(height: 18),
-          _SecondaryAuthButton(
-            text: 'Назад ко входу',
-            onPressed: () => setState(() => _registrationMode = false),
+            onPressed: () => _showError(
+              'Новый аккаунт создаёт администратор организации.',
+            ),
           ),
         ],
       ),
@@ -274,29 +190,6 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
       }
     } finally {
       if (mounted) setState(() => _loginLoading = false);
-    }
-  }
-
-  Future<void> _tryRegister() async {
-    if (!_regKey.currentState!.validate()) return;
-
-    setState(() => _regLoading = true);
-    try {
-      final ok = await AuthService.register(
-        _regEmail.text.trim(),
-        _regPass.text.trim(),
-        _regName.text.trim(),
-        _regOrg.text.trim(),
-      );
-
-      if (!mounted) return;
-      if (ok) {
-        Navigator.pushReplacementNamed(context, '/security-setup');
-      } else {
-        _showError('Ошибка регистрации.');
-      }
-    } finally {
-      if (mounted) setState(() => _regLoading = false);
     }
   }
 

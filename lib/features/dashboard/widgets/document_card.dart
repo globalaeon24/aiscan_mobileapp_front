@@ -1,87 +1,113 @@
 import 'package:flutter/material.dart';
 
-import '../../../theme/app_theme.dart';
 import '../models/dashboard_document.dart';
 
 class DocumentCard extends StatelessWidget {
   final DashboardDocument document;
+  final VoidCallback? onTap;
 
   const DocumentCard({
     super.key,
     required this.document,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 68),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFDDE7F7)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1D4ED8).withValues(alpha: 0.07),
-            blurRadius: 16,
-            offset: const Offset(0, 7),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 68),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE7ECF5)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF142350).withValues(alpha: 0.05),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0FF),
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(color: const Color(0xFFDCE7FF)),
-            ),
-            child: const Icon(
-              Icons.insert_drive_file_outlined,
-              color: OySynAuthTokens.primaryBlue,
-              size: 23,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  document.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF111827),
-                    fontSize: 14,
-                    height: 1.15,
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _fileBackground(document.title),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _fileType(document.title),
+                  style: TextStyle(
+                    color: _fileColor(document.title),
+                    fontSize: 8,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  document.subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF6B7280),
-                    fontSize: 12,
-                    height: 1.2,
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      document.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF111827),
+                        fontSize: 14,
+                        height: 1.15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      document.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF6B7280),
+                        fontSize: 12,
+                        height: 1.2,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 6),
+              _DocumentStatuses(document: document),
+            ],
           ),
-          const SizedBox(width: 6),
-          _DocumentStatuses(document: document),
-        ],
+        ),
       ),
     );
   }
+
+  static String _fileType(String title) {
+    final value = title.toLowerCase();
+    if (value.endsWith('.pdf') || value.contains('pdf')) return 'PDF';
+    if (value.endsWith('.docx') || value.contains('word')) return 'DOCX';
+    return 'DOC';
+  }
+
+  static Color _fileBackground(String title) => _fileType(title) == 'PDF'
+      ? const Color(0xFFFDEBEA)
+      : const Color(0xFFE8EEFF);
+
+  static Color _fileColor(String title) => _fileType(title) == 'PDF'
+      ? const Color(0xFFE0463A)
+      : const Color(0xFF2F5FE0);
 }
 
 class _DocumentStatuses extends StatelessWidget {

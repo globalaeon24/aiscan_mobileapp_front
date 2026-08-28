@@ -6,22 +6,22 @@ class OySynAuthTokens {
 
   static const String logoAsset = 'assets/icons/oysyn_logo.png';
 
-  static const Color primaryBlue = Color(0xFF3F73F6);
-  static const Color deepBlue = Color(0xFF1F4FD8);
-  static const Color linkBlue = Color(0xFF2F6BFF);
-  static const Color textDark = Color(0xFF111827);
-  static const Color textMuted = Color(0xFF64748B);
-  static const Color iconGrey = Color(0xFF737D84);
-  static const Color fieldBorder = Color(0xFFD2DFFF);
-  static const Color divider = Color(0xFFE2E8F0);
+  static const Color primaryBlue = Color(0xFF3972FE);
+  static const Color deepBlue = Color(0xFF2F5FE0);
+  static const Color linkBlue = Color(0xFF3972FE);
+  static const Color textDark = Color(0xFF12203E);
+  static const Color textMuted = Color(0xFF8A94A6);
+  static const Color iconGrey = Color(0xFF9AA4B8);
+  static const Color fieldBorder = Color(0xFFE7ECF5);
+  static const Color divider = Color(0xFFE7ECF5);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color topWash = Color(0xFFEAF0FF);
   static const Color shadowBlue = Color(0x333F73F6);
-  static const Color appBackground = Color(0xFFF0F5FF);
+  static const Color appBackground = Color(0xFFF1F5FD);
   static const Color appBackgroundWarm = Color(0xFFFBFDFF);
 
   static const double contentMaxWidth = 390;
-  static const double screenHorizontalPadding = 24;
+  static const double screenHorizontalPadding = 20;
   static const double fieldHeight = 56;
   static const double fieldRadius = 12;
   static const double buttonHeight = 56;
@@ -34,7 +34,7 @@ class OySynTextStyles {
 
   static TextStyle get welcomeTitle => GoogleFonts.dmSans(
         color: OySynAuthTokens.textDark,
-        fontSize: 26,
+        fontSize: 22,
         height: 1.12,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
@@ -42,16 +42,16 @@ class OySynTextStyles {
 
   static TextStyle get sectionTitle => GoogleFonts.dmSans(
         color: OySynAuthTokens.textDark,
-        fontSize: 24,
-        height: 31 / 24,
+        fontSize: 22,
+        height: 28 / 22,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       );
 
   static TextStyle get recentDocumentsTitle => GoogleFonts.dmSans(
         color: OySynAuthTokens.textDark,
-        fontSize: 18,
-        height: 24 / 18,
+        fontSize: 15,
+        height: 20 / 15,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
       );

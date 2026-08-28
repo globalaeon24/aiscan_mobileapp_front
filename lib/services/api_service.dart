@@ -74,8 +74,6 @@ class ApiService {
 
   // ===================== LOGOUT =====================
   static Future<void> _forceLogout() async {
-    print("🔥 FORCE LOGOUT");
-
     await TokenStorage.clear();
     await SecurityService.clear();
 

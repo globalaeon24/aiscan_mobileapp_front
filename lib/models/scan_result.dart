@@ -34,7 +34,8 @@ class ScanResult {
   final String? authorName;
 
   // 🔥 ОСНОВНОЕ
-  final double aiPercentage;
+  final double originalityPercentage;
+  final double? aiPercentage;
   final String scannedText;
   final String? highlightedText;
   final DateTime createdAt;
@@ -44,7 +45,8 @@ class ScanResult {
 
   ScanResult({
     required this.id,
-    required this.aiPercentage,
+    required this.originalityPercentage,
+    this.aiPercentage,
     required this.scannedText,
     required this.highlightedText,
     required this.createdAt,
@@ -76,13 +78,14 @@ class ScanResult {
       fileName: (json['file_name'] ?? json['document_name'] ?? json['title'])
           ?.toString(),
       authorName: (json['author_name'] ?? json['author'])?.toString(),
-      aiPercentage: _asDouble(
+      originalityPercentage: _asDouble(
+        json['originality_percentage'] ?? json['originality_percent'] ?? 0,
+      ),
+      aiPercentage: _asNullableDouble(
         json['ai_percentage'] ??
             json['ai_probability_percent'] ??
             json['ai_percent'] ??
-            json['originality_percentage'] ??
-            json['originality_percent'] ??
-            0,
+            json['chatgpt_generated_percentage'],
       ),
       scannedText:
           json['scanned_text'] ?? json['text'] ?? json['summary'] ?? "",
@@ -110,5 +113,10 @@ class ScanResult {
   static double _asDouble(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? 0.0;
+  }
+
+  static double? _asNullableDouble(dynamic value) {
+    if (value == null) return null;
+    return _asDouble(value);
   }
 }
