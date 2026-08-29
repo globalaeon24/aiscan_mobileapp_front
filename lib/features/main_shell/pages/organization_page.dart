@@ -34,9 +34,12 @@ class _OrganizationPageState extends State<OrganizationPage> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return _ErrorState(onRetry: () {
-                setState(() => _future = ProfileService.getOrganizations());
-              });
+              return _ErrorState(
+                message: snapshot.error.toString(),
+                onRetry: () {
+                  setState(() => _future = ProfileService.getOrganizations());
+                },
+              );
             }
 
             final organizations = snapshot.data ?? const [];
@@ -183,7 +186,7 @@ class _OrganizationDetails extends StatelessWidget {
               icon: Icons.history_rounded,
               title: 'Журнал биллинга',
               subtitle: 'История операций и аналитика',
-              onTap: () => _showUnavailable(context),
+              onTap: id == null ? null : () => _showBillingJournal(context, id),
             ),
           ],
         ),
@@ -257,11 +260,40 @@ class _OrganizationDetails extends StatelessWidget {
     );
   }
 
+  Future<void> _showBillingJournal(BuildContext context, int id) async {
+    try {
+      final rows = await ProfileService.getOrganizationBillingJournal(id);
+      if (!context.mounted) return;
+      _showDataSheet(
+        context,
+        'Журнал биллинга',
+        rows
+            .map((row) => (
+                  _text(
+                    row['check_type_display'] ?? row['description'],
+                    'Операция',
+                  ),
+                  _journalValue(row),
+                ))
+            .toList(),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      _showLoadError(context, error);
+    }
+  }
+
   void _showUnavailable(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
           content:
               Text('Этот раздел будет подключён после расширения API Core.')),
+    );
+  }
+
+  void _showLoadError(BuildContext context, Object error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Не удалось загрузить данные: $error')),
     );
   }
 }
@@ -488,11 +520,68 @@ class _SquareButton extends StatelessWidget {
 
 class _ErrorState extends StatelessWidget {
   final VoidCallback onRetry;
-  const _ErrorState({required this.onRetry});
+  final String message;
+  const _ErrorState({required this.onRetry, required this.message});
+
   @override
-  Widget build(BuildContext context) => Center(
-        child: FilledButton(
-            onPressed: onRetry, child: const Text('Повторить загрузку')),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 36),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _SquareButton(
+                  icon: Icons.arrow_back_ios_new_rounded,
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(width: 18),
+                const Text('Организация', style: _Styles.pageTitle),
+              ],
+            ),
+            const Spacer(),
+            Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 360),
+                padding: const EdgeInsets.all(20),
+                decoration: _Styles.cardDecoration,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.cloud_off_rounded,
+                      color: OySynAuthTokens.primaryBlue,
+                      size: 38,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Не удалось загрузить организацию',
+                      textAlign: TextAlign.center,
+                      style: _Styles.cardTitle,
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      message,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: _Styles.subtitle,
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: 210,
+                      child: FilledButton(
+                        onPressed: onRetry,
+                        child: const Text('Повторить'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Spacer(),
+          ],
+        ),
       );
 }
 
@@ -561,4 +650,12 @@ String _date(dynamic value) {
   final date = DateTime.tryParse(value?.toString() ?? '');
   if (date == null) return '';
   return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+}
+
+String _journalValue(Map<String, dynamic> row) {
+  final delta = _asInt(row['org_delta_checks']) ?? 0;
+  final date = _date(row['time']);
+  final type = row['transaction_type']?.toString();
+  final sign = type == 'OUTCOME' ? '-' : '+';
+  return ['$sign$delta', if (date.isNotEmpty) date].join(' · ');
 }

@@ -74,6 +74,13 @@ class ProfileService {
     return data.whereType<Map<String, dynamic>>().toList();
   }
 
+  static Future<List<Map<String, dynamic>>> getOrganizationBillingJournal(
+      int organizationId) async {
+    final data = await _get('/organizations/$organizationId/billing-journal');
+    if (data is! List) return const [];
+    return data.whereType<Map<String, dynamic>>().toList();
+  }
+
   static Future<dynamic> _get(String path) async {
     final token = await TokenStorage.getToken();
     if (token == null) throw Exception('Нет токена авторизации.');
