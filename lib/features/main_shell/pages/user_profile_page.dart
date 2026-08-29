@@ -64,7 +64,29 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 onChanged: (value) => setState(() => _tab = value)),
             const SizedBox(height: 16),
             switch (_tab) {
-              0 => _AccountCard(user: user),
+              0 => Column(
+                  children: [
+                    _AccountCard(user: user),
+                    const SizedBox(height: 14),
+                    _NavigationCard(
+                      icon: Icons.business_outlined,
+                      title: 'Организация',
+                      subtitle: _text(
+                        user['organization_name'],
+                        'Данные и управление',
+                      ),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => OrganizationPage(
+                            initialOrganizationId: _nullableInt(
+                              user['organization_id'],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               1 => _InfoCard(
                   icon: Icons.bar_chart_rounded,
                   title: 'Статистика',
@@ -75,44 +97,41 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   title: 'Уведомления',
                   text:
                       'Настройки уведомлений будут подключены после расширения API Core.'),
-              _ => const _InfoCard(
-                  icon: Icons.shield_outlined,
-                  title: 'Защита аккаунта',
-                  text: 'PIN-код, биометрия и активные сессии.'),
-            },
-            const SizedBox(height: 14),
-            _NavigationCard(
-              icon: Icons.business_outlined,
-              title: 'Организация',
-              subtitle: _text(user['organization_name'], 'Данные и управление'),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => OrganizationPage(
-                      initialOrganizationId:
-                          _nullableInt(user['organization_id'])),
+              _ => Column(
+                  children: [
+                    const _InfoCard(
+                      icon: Icons.shield_outlined,
+                      title: 'Защита аккаунта',
+                      text: 'PIN-код, биометрия и активные сессии.',
+                    ),
+                    const SizedBox(height: 14),
+                    _NavigationCard(
+                      icon: Icons.devices_rounded,
+                      title: 'Связанные устройства',
+                      subtitle: 'Активные веб-сессии',
+                      onTap: () =>
+                          Navigator.of(context).pushNamed('/linked-devices'),
+                    ),
+                  ],
                 ),
+            },
+            if (_tab == 0) ...[
+              const SizedBox(height: 14),
+              TextButton.icon(
+                onPressed: _logout,
+                style: TextButton.styleFrom(
+                  alignment: Alignment.centerLeft,
+                  foregroundColor: const Color(0xFFDF3E48),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Выйти из аккаунта'),
               ),
-            ),
-            const SizedBox(height: 10),
-            _NavigationCard(
-              icon: Icons.devices_rounded,
-              title: 'Связанные устройства',
-              subtitle: 'Активные веб-сессии',
-              onTap: () => Navigator.of(context).pushNamed('/linked-devices'),
-            ),
-            const SizedBox(height: 14),
-            TextButton.icon(
-              onPressed: _logout,
-              style: TextButton.styleFrom(
-                alignment: Alignment.centerLeft,
-                foregroundColor: const Color(0xFFDF3E48),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                textStyle:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-              ),
-              icon: const Icon(Icons.logout_rounded),
-              label: const Text('Выйти из аккаунта'),
-            ),
+            ],
           ],
         );
       },

@@ -1,5 +1,6 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:printing/printing.dart';
 
 import '../models/check_report.dart';
@@ -235,65 +236,201 @@ class _MetricsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final originality = report?.originality ?? detail.originalityPercentage;
+    final plagiarism = report?.plagiarism ?? 0;
+    final citation = report?.citation ?? 0;
+    final selfCitation = report?.selfCitation ?? 0;
+    final aiGenerated = report?.aiGenerated ?? detail.aiPercentage ?? 0;
+    final reportedHuman = report?.humanWritten;
+    final humanWritten =
+        reportedHuman != null && reportedHuman + aiGenerated > 0
+            ? reportedHuman
+            : (100 - aiGenerated).clamp(0, 100);
+    const originalityColor = Color(0xFF22A45D);
+    const plagiarismColor = Color(0xFFE75555);
+    const citationColor = Color(0xFF71809E);
+    const selfCitationColor = Color(0xFFF0A22E);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _reportCardDecoration(),
-      child: Row(
+      child: Column(
         children: [
-          CircularPercentIndicator(
-            radius: 59,
-            lineWidth: 11,
-            percent: (originality / 100).clamp(0, 1),
-            progressColor: const Color(0xFF22A45D),
-            backgroundColor: const Color(0xFFEEF1F6),
-            circularStrokeCap: CircularStrokeCap.round,
-            center: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${originality.toStringAsFixed(0)}%',
-                  style: const TextStyle(
-                    color: Color(0xFF148A4E),
-                    fontSize: 26,
-                    height: 1,
-                    fontWeight: FontWeight.w800,
+          Row(
+            children: [
+              SizedBox.square(
+                dimension: 118,
+                child: CustomPaint(
+                  painter: _SegmentedReportRingPainter(
+                    segments: [
+                      (originality, originalityColor),
+                      (plagiarism, plagiarismColor),
+                      (citation, citationColor),
+                      (selfCitation, selfCitationColor),
+                    ],
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${originality.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            color: Color(0xFF148A4E),
+                            fontSize: 26,
+                            height: 1,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'оригинальность',
+                          style: TextStyle(
+                            color: Color(0xFF8A94A6),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 3),
-                const Text(
-                  'оригинальность',
-                  style: TextStyle(color: Color(0xFF8A94A6), fontSize: 10),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  children: [
+                    _MetricRow(
+                      label: 'Оригинальность',
+                      value: originality,
+                      color: originalityColor,
+                    ),
+                    _MetricRow(
+                      label: 'Совпадения',
+                      value: plagiarism,
+                      color: plagiarismColor,
+                    ),
+                    _MetricRow(
+                      label: 'Цитирования',
+                      value: citation,
+                      color: citationColor,
+                    ),
+                    _MetricRow(
+                      label: 'Самоцитирования',
+                      value: selfCitation,
+                      color: selfCitationColor,
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            ],
+          ),
+          const Divider(height: 22),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'ИИ-контент',
+                  style: TextStyle(color: Color(0xFF46506A), fontSize: 12.5),
+                ),
+              ),
+              Text(
+                '${aiGenerated.toStringAsFixed(2)}%',
+                style: const TextStyle(
+                  color: Color(0xFF6D4EF0),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              height: 9,
+              child: Row(
+                children: [
+                  if (aiGenerated > 0)
+                    Expanded(
+                      flex: math.max(1, (aiGenerated * 10).round()),
+                      child: const ColoredBox(color: Color(0xFF7454F5)),
+                    ),
+                  if (humanWritten > 0)
+                    Expanded(
+                      flex: math.max(1, (humanWritten * 10).round()),
+                      child: const ColoredBox(color: Color(0xFFDDE4F3)),
+                    ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              children: [
-                _MetricRow(
-                    label: 'Оригинальность',
-                    value: originality,
-                    color: const Color(0xFF148A4E)),
-                _MetricRow(
-                    label: 'Совпадения',
-                    value: report?.plagiarism,
-                    color: const Color(0xFFD23B41)),
-                _MetricRow(label: 'Цитирования', value: report?.citation),
-                _MetricRow(
-                    label: 'Самоцитирования', value: report?.selfCitation),
-                const Divider(height: 15),
-                _MetricRow(
-                    label: 'ИИ-контент',
-                    value: report?.aiGenerated,
-                    color: const Color(0xFF6D4EF0)),
-              ],
-            ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              const _LegendDot(color: Color(0xFF7454F5)),
+              const SizedBox(width: 5),
+              const Text('ИИ',
+                  style: TextStyle(color: Color(0xFF6D4EF0), fontSize: 11.5)),
+              const Spacer(),
+              const _LegendDot(color: Color(0xFFDDE4F3)),
+              const SizedBox(width: 5),
+              Text(
+                'Текст человека ${humanWritten.toStringAsFixed(2)}%',
+                style:
+                    const TextStyle(color: Color(0xFF71809E), fontSize: 11.5),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+}
+
+class _SegmentedReportRingPainter extends CustomPainter {
+  final List<(double, Color)> segments;
+
+  const _SegmentedReportRingPainter({required this.segments});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const width = 11.0;
+    final rect = Offset.zero & size;
+    final arcRect = rect.deflate(width / 2);
+    final background = Paint()
+      ..color = const Color(0xFFEEF1F6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width;
+    canvas.drawArc(arcRect, -math.pi / 2, math.pi * 2, false, background);
+
+    var start = -math.pi / 2;
+    for (final segment in segments) {
+      final value = segment.$1.clamp(0, 100);
+      if (value <= 0) continue;
+      final sweep = math.pi * 2 * value / 100;
+      final paint = Paint()
+        ..color = segment.$2
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.butt;
+      canvas.drawArc(arcRect, start, sweep, false, paint);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SegmentedReportRingPainter oldDelegate) =>
+      oldDelegate.segments != segments;
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  const _LegendDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
 }
 
 class _MetricRow extends StatelessWidget {
@@ -312,6 +449,8 @@ class _MetricRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
+          _LegendDot(color: color),
+          const SizedBox(width: 7),
           Expanded(
               child: Text(label,
                   style: const TextStyle(
