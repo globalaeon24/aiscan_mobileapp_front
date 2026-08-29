@@ -13,8 +13,11 @@ enum DocumentStatusType {
 class DashboardDocument {
   final String title;
   final String subtitle;
-  final int? originalityPercent;
-  final int? aiPercent;
+  final String? fileName;
+  final String? documentType;
+  final int? fileSize;
+  final double? originalityPercent;
+  final double? aiPercent;
   final String? statusText;
   final DocumentStatusType statusType;
   final DateTime? createdAt;
@@ -23,6 +26,9 @@ class DashboardDocument {
   const DashboardDocument({
     required this.title,
     required this.subtitle,
+    this.fileName,
+    this.documentType,
+    this.fileSize,
     this.originalityPercent,
     this.aiPercent,
     this.statusText,
@@ -33,10 +39,8 @@ class DashboardDocument {
 
   factory DashboardDocument.fromScanResult(ScanResult result) {
     final statusType = _statusType(result.status);
-    final originality = result.originalityPercentage > 0
-        ? result.originalityPercentage.round().clamp(0, 100)
-        : null;
-    final ai = result.aiPercentage?.round().clamp(0, 100);
+    final originality = result.originalityPercentage.clamp(0, 100).toDouble();
+    final ai = result.aiPercentage?.clamp(0, 100).toDouble();
     final author = result.authorName?.trim();
     final date = result.createdAt;
     final dateText =
@@ -52,6 +56,9 @@ class DashboardDocument {
       id: result.id,
       title: result.title ?? result.fileName ?? 'Документ №${result.id}',
       subtitle: details.join(' · '),
+      fileName: result.fileName,
+      documentType: result.documentType,
+      fileSize: result.fileSize,
       originalityPercent:
           statusType == DocumentStatusType.success ? originality : null,
       aiPercent: statusType == DocumentStatusType.success ? ai : null,
@@ -107,6 +114,44 @@ class DashboardDocument {
 
   Color get aiBackground => const Color(0xFFF0E2FF);
   Color get aiColor => const Color(0xFF8B3FF6);
+
+  String get fileType {
+    final value = (fileName ?? title).toLowerCase();
+    if (value.endsWith('.pdf')) return 'PDF';
+    if (value.endsWith('.docx')) return 'DOCX';
+    if (value.endsWith('.txt')) return 'TXT';
+    return 'DOC';
+  }
+
+  String get detailSubtitle {
+    final author = subtitle.split(' · ').firstWhere(
+          (part) =>
+              !part.contains(RegExp(r'^\d{2}\.\d{2}$')) && part != documentType,
+          orElse: () => 'Автор не указан',
+        );
+    return [
+      documentType?.trim().isNotEmpty == true ? documentType! : 'Документ',
+      if (fileSize != null) _formatBytes(fileSize!),
+      author.trim().isEmpty ? 'Автор не указан' : author,
+    ].join(' · ');
+  }
+
+  String get dateLabel {
+    final date = createdAt;
+    if (date == null) return '';
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+  }
+
+  String get recommendationLabel => (originalityPercent ?? 100) < 60
+      ? 'Низкая оригинальность'
+      : 'Рекомендация';
+
+  static String _formatBytes(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} МБ';
+    }
+    return '${(bytes / 1024).toStringAsFixed(1)} КБ';
+  }
 }
 
 class OySynDocumentColors {

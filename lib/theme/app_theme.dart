@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class OySynAuthTokens {
   const OySynAuthTokens._();
@@ -32,37 +31,37 @@ class OySynAuthTokens {
 class OySynTextStyles {
   const OySynTextStyles._();
 
-  static TextStyle get welcomeTitle => GoogleFonts.dmSans(
-        color: OySynAuthTokens.textDark,
-        fontSize: 22,
-        height: 1.12,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-      );
+  static const TextStyle welcomeTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 22,
+    height: 1.12,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0,
+  );
 
-  static TextStyle get sectionTitle => GoogleFonts.dmSans(
-        color: OySynAuthTokens.textDark,
-        fontSize: 22,
-        height: 28 / 22,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-      );
+  static const TextStyle sectionTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 22,
+    height: 28 / 22,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0,
+  );
 
-  static TextStyle get recentDocumentsTitle => GoogleFonts.dmSans(
-        color: OySynAuthTokens.textDark,
-        fontSize: 15,
-        height: 20 / 15,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-      );
+  static const TextStyle recentDocumentsTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 15,
+    height: 20 / 15,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0,
+  );
 
-  static TextStyle get authLogo => GoogleFonts.dmSans(
-        color: OySynAuthTokens.primaryBlue,
-        fontSize: 30,
-        height: 1,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0,
-      );
+  static const TextStyle authLogo = TextStyle(
+    color: OySynAuthTokens.primaryBlue,
+    fontSize: 30,
+    height: 1,
+    fontWeight: FontWeight.w800,
+    letterSpacing: 0,
+  );
 }
 
 ThemeData buildAppTheme() {
@@ -76,7 +75,7 @@ ThemeData buildAppTheme() {
     ),
   );
 
-  final textTheme = GoogleFonts.manropeTextTheme(base.textTheme).apply(
+  final textTheme = base.textTheme.apply(
     bodyColor: OySynAuthTokens.textDark,
     displayColor: OySynAuthTokens.textDark,
   );

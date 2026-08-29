@@ -33,6 +33,30 @@ class CheckHistoryPage {
   }
 }
 
+class CheckModule {
+  final String code;
+  final String label;
+  final String group;
+  final bool required;
+  final bool selected;
+
+  const CheckModule({
+    required this.code,
+    required this.label,
+    required this.group,
+    required this.required,
+    required this.selected,
+  });
+
+  factory CheckModule.fromJson(Map<String, dynamic> json) => CheckModule(
+        code: json['code']?.toString() ?? '',
+        label: json['label']?.toString() ?? '',
+        group: json['group']?.toString() ?? 'base',
+        required: json['required'] == true,
+        selected: json['selected'] != false,
+      );
+}
+
 class ScanService {
   static const String baseUrl = ApiConfig.baseUrl;
 
@@ -57,6 +81,8 @@ class ScanService {
     String? documentType,
     bool includeOcr = false,
     bool aiCheck = true,
+    List<String>? modules,
+    List<String>? modulesKz,
   }) async {
     final token = await TokenStorage.getToken();
     if (token == null) {
@@ -71,6 +97,8 @@ class ScanService {
     request.fields["include_ocr"] = includeOcr.toString();
     request.fields["ocr_languages"] = "rus+kaz+eng";
     request.fields["ai_check"] = aiCheck.toString();
+    if (modules != null) request.fields['modules'] = modules.join(',');
+    if (modulesKz != null) request.fields['modules_kz'] = modulesKz.join(',');
     if (author != null && author.trim().isNotEmpty) {
       request.fields["author"] = author.trim();
     }
@@ -179,6 +207,24 @@ class ScanService {
     } else {
       throw Exception("Ошибка истории: ${res.statusCode} ${res.body}");
     }
+  }
+
+  static Future<List<CheckModule>> getCheckModules() async {
+    final token = await TokenStorage.getToken();
+    if (token == null) throw Exception('Нет токена авторизации.');
+
+    final response = await http.get(
+      Uri.parse('$baseUrl/checks/modules'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Не удалось загрузить модули: ${response.statusCode}');
+    }
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data
+        .map((item) => CheckModule.fromJson(item as Map<String, dynamic>))
+        .where((item) => item.code.isNotEmpty)
+        .toList();
   }
 
   /// ================================================================

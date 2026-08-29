@@ -32,6 +32,9 @@ class ScanResult {
   final int? userScanIndex;
   final String? fileName;
   final String? authorName;
+  final String? department;
+  final int? fileSize;
+  final List<String> modules;
 
   // 🔥 ОСНОВНОЕ
   final double originalityPercentage;
@@ -58,6 +61,9 @@ class ScanResult {
     this.userScanIndex,
     this.fileName,
     this.authorName,
+    this.department,
+    this.fileSize,
+    this.modules = const [],
   });
 
   factory ScanResult.fromJson(Map<String, dynamic> json) {
@@ -78,6 +84,11 @@ class ScanResult {
       fileName: (json['file_name'] ?? json['document_name'] ?? json['title'])
           ?.toString(),
       authorName: (json['author_name'] ?? json['author'])?.toString(),
+      department: json['department']?.toString(),
+      fileSize: _asNullableInt(json['file_size']),
+      modules: (json['modules'] as List<dynamic>? ?? const [])
+          .map((value) => value.toString())
+          .toList(),
       originalityPercentage: _asDouble(
         json['originality_percentage'] ?? json['originality_percent'] ?? 0,
       ),

@@ -27,8 +27,16 @@ class PinCodeInputState extends State<PinCodeInput> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
+      if (mounted) _activateInput();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant PinCodeInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.enabled && widget.enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _activateInput());
+    }
   }
 
   @override
@@ -41,7 +49,17 @@ class PinCodeInputState extends State<PinCodeInput> {
   void clear() {
     _controller.clear();
     setState(() {});
+    _activateInput();
+  }
+
+  void _activateInput() {
+    if (!mounted || !widget.enabled) return;
     _focusNode.requestFocus();
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (mounted && widget.enabled) {
+        SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+      }
+    });
   }
 
   void _onChanged(String value) {
@@ -65,27 +83,41 @@ class PinCodeInputState extends State<PinCodeInput> {
     return Column(
       children: [
         GestureDetector(
-          onTap: widget.enabled ? _focusNode.requestFocus : null,
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.enabled ? _activateInput : null,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              Opacity(
-                opacity: 0,
-                child: SizedBox(
-                  width: 1,
-                  height: 1,
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.01,
                   child: TextField(
                     controller: _controller,
                     focusNode: _focusNode,
                     enabled: widget.enabled,
-                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    showCursor: false,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: false,
+                      decimal: false,
+                    ),
+                    textInputAction: TextInputAction.done,
                     maxLength: 4,
                     inputFormatters: [
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(4),
                     ],
                     onChanged: _onChanged,
-                    decoration: const InputDecoration(counterText: ''),
+                    onTap: _activateInput,
+                    style: const TextStyle(color: Colors.transparent),
+                    cursorColor: Colors.transparent,
+                    decoration: const InputDecoration(
+                      counterText: '',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 ),
               ),

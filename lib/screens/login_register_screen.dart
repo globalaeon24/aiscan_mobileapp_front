@@ -45,7 +45,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final compact = constraints.maxHeight < 760;
+              final compact = constraints.maxHeight < 700;
 
               return SingleChildScrollView(
                 physics: const ClampingScrollPhysics(),
@@ -62,13 +62,13 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                         ),
                         child: Column(
                           children: [
-                            SizedBox(height: compact ? 28 : 70),
+                            SizedBox(height: compact ? 24 : 44),
                             const _OySynBrand(),
-                            SizedBox(height: compact ? 36 : 48),
+                            SizedBox(height: compact ? 28 : 36),
                             _buildLoginForm(),
-                            SizedBox(height: compact ? 44 : 120),
+                            SizedBox(height: compact ? 36 : 72),
                             const Text(
-                              'OySyn · v1.0.0',
+                              'OySyn · antiplagiat',
                               style: TextStyle(
                                 color: OySynAuthTokens.textMuted,
                                 fontSize: 13,
@@ -97,7 +97,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
         key: const ValueKey('login'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _AuthLabel('Email или логин'),
+          const _AuthLabel('Логин'),
           const SizedBox(height: 10),
           _AuthField(
             controller: _loginEmail,
@@ -108,7 +108,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                 ? 'Введите email или логин'
                 : null,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           const _AuthLabel('Пароль'),
           const SizedBox(height: 10),
           _AuthField(
@@ -152,19 +152,46 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 42),
+          const SizedBox(height: 20),
           _PrimaryAuthButton(
             text: 'Войти',
             loading: _loginLoading,
             onPressed: _tryLogin,
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 26),
           const _OrDivider(),
-          const SizedBox(height: 30),
-          _SecondaryAuthButton(
-            text: 'Зарегистрироваться',
+          const SizedBox(height: 24),
+          _GoogleAuthButton(
             onPressed: () => _showError(
-              'Новый аккаунт создаёт администратор организации.',
+              'Вход через Google пока не подключён для этой организации.',
+            ),
+          ),
+          const SizedBox(height: 22),
+          Center(
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              children: [
+                const Text(
+                  'Ещё нет аккаунта? ',
+                  style: TextStyle(
+                    color: Color(0xFF6A7590),
+                    fontSize: 13.5,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _showError(
+                    'Новый аккаунт создаёт администратор организации.',
+                  ),
+                  child: const Text(
+                    'Зарегистрироваться',
+                    style: TextStyle(
+                      color: OySynAuthTokens.linkBlue,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -218,7 +245,7 @@ class _OySynBrand extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'OySynmobile',
+          'OySyn',
           style: OySynTextStyles.authLogo,
         ),
         const SizedBox(height: 8),
@@ -226,7 +253,7 @@ class _OySynBrand extends StatelessWidget {
           'Вход в аккаунт',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: OySynAuthTokens.textDark,
-                fontSize: 16,
+                fontSize: 14,
                 height: 1.1,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0,
@@ -248,7 +275,7 @@ class _AuthLabel extends StatelessWidget {
       text,
       style: const TextStyle(
         color: OySynAuthTokens.textDark,
-        fontSize: 14,
+        fontSize: 13,
         height: 1.1,
         fontWeight: FontWeight.w700,
         letterSpacing: 0,
@@ -386,14 +413,10 @@ class _PrimaryAuthButton extends StatelessWidget {
   }
 }
 
-class _SecondaryAuthButton extends StatelessWidget {
-  final String text;
+class _GoogleAuthButton extends StatelessWidget {
   final VoidCallback onPressed;
 
-  const _SecondaryAuthButton({
-    required this.text,
-    required this.onPressed,
-  });
+  const _GoogleAuthButton({required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -412,13 +435,28 @@ class _SecondaryAuthButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(OySynAuthTokens.buttonRadius),
           ),
         ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0,
-          ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'G',
+              style: TextStyle(
+                color: Color(0xFF4285F4),
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Продолжить с Google',
+              style: TextStyle(
+                color: Color(0xFF3B475F),
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -35,7 +35,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<_DashboardData> _load() async {
-    final results = await ScanService.getHistory();
+    final history = await ScanService.getHistoryPage(page: 1, pageSize: 20);
+    final results = history.items;
     final user = await _loadUser();
     final docs = results.map(DashboardDocument.fromScanResult).toList();
     final completed = docs
@@ -53,7 +54,7 @@ class _DashboardPageState extends State<DashboardPage> {
       user: user,
       results: results,
       documents: docs,
-      totalDocuments: docs.length,
+      totalDocuments: history.total ?? docs.length,
       averageOriginality: avg,
       checksAvailable: _asInt(user?['checks_available']),
       monthlyDocuments: results.where(_isCurrentMonth).length,
@@ -143,7 +144,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       children: [
                         Expanded(
                           child: Text(
-                            'Последние документы',
+                            'Последние проверки',
                             style: OySynTextStyles.recentDocumentsTitle,
                           ),
                         ),
@@ -264,7 +265,7 @@ class _UploadAction extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Выберите файл · PDF, DOCX, DOC',
+                'Перетащите или выберите файл · PDF, DOCX, TXT',
                 style: TextStyle(color: Color(0xFF8A94A6), fontSize: 12.5),
               ),
             ],

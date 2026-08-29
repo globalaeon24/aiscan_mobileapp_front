@@ -32,6 +32,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
   final TextEditingController _searchController = TextEditingController();
   late Future<CheckHistoryPage> _future;
   _PeriodFilter _period = _PeriodFilter.all;
+  String? _statusFilter;
+  bool _newestFirst = true;
   int _page = 1;
   String _query = '';
 
@@ -85,6 +87,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
     return items.where((item) {
       final matchesPeriod = from == null || !item.createdAt.isBefore(from);
+      final matchesStatus =
+          _statusFilter == null || item.status == _statusFilter;
       final haystack = [
         item.title,
         item.fileName,
@@ -92,9 +96,11 @@ class _DocumentsPageState extends State<DocumentsPage> {
         item.documentType,
       ].whereType<String>().join(' ').toLowerCase();
       final matchesSearch = _query.isEmpty || haystack.contains(_query);
-      return matchesPeriod && matchesSearch;
+      return matchesPeriod && matchesStatus && matchesSearch;
     }).toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      ..sort((a, b) => _newestFirst
+          ? b.createdAt.compareTo(a.createdAt)
+          : a.createdAt.compareTo(b.createdAt));
   }
 
   @override
@@ -125,19 +131,33 @@ class _DocumentsPageState extends State<DocumentsPage> {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
+                  const SizedBox(width: 10),
+                  IconButton(
+                    onPressed: () {},
+                    tooltip: 'Папки',
+                    icon: const Icon(Icons.folder_outlined),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: OySynAuthTokens.divider),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
+              const _DocumentTabs(),
+              const SizedBox(height: 12),
               _DocumentFilters(
                 controller: _searchController,
                 selectedPeriod: _period,
                 onPeriodChanged: (period) => setState(() => _period = period),
-              ),
-              const SizedBox(height: 12),
-              _PageSummary(
-                page: _page,
-                pageData: pageData,
-                visibleCount: filtered.length,
+                statusFilter: _statusFilter,
+                onStatusChanged: (status) =>
+                    setState(() => _statusFilter = status),
+                newestFirst: _newestFirst,
+                onSortChanged: () =>
+                    setState(() => _newestFirst = !_newestFirst),
               ),
               const SizedBox(height: 12),
               if (snapshot.hasError)
@@ -157,6 +177,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 for (final result in filtered) ...[
                   DocumentCard(
                     document: DashboardDocument.fromScanResult(result),
+                    detailed: true,
                     onTap: () => _openResult(result),
                   ),
                   const SizedBox(height: 8),
@@ -182,11 +203,19 @@ class _DocumentFilters extends StatelessWidget {
   final TextEditingController controller;
   final _PeriodFilter selectedPeriod;
   final ValueChanged<_PeriodFilter> onPeriodChanged;
+  final String? statusFilter;
+  final ValueChanged<String?> onStatusChanged;
+  final bool newestFirst;
+  final VoidCallback onSortChanged;
 
   const _DocumentFilters({
     required this.controller,
     required this.selectedPeriod,
     required this.onPeriodChanged,
+    required this.statusFilter,
+    required this.onStatusChanged,
+    required this.newestFirst,
+    required this.onSortChanged,
   });
 
   @override
@@ -208,67 +237,131 @@ class _DocumentFilters extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final period in _PeriodFilter.values) ...[
-                  ChoiceChip(
-                    label: Text(period.label),
-                    selected: selectedPeriod == period,
-                    onSelected: (_) => onPeriodChanged(period),
-                    visualDensity: VisualDensity.compact,
-                    labelStyle: TextStyle(
-                      color: selectedPeriod == period
-                          ? OySynAuthTokens.primaryBlue
-                          : const Color(0xFF475569),
-                      fontWeight: FontWeight.w700,
-                    ),
-                    selectedColor: const Color(0xFFEAF0FF),
-                    backgroundColor: Colors.white,
-                    side: BorderSide(
-                      color: selectedPeriod == period
-                          ? OySynAuthTokens.primaryBlue.withValues(alpha: 0.32)
-                          : const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ],
+        Row(
+          children: [
+            Expanded(
+              child: PopupMenuButton<_PeriodFilter>(
+                initialValue: selectedPeriod,
+                onSelected: onPeriodChanged,
+                itemBuilder: (_) => _PeriodFilter.values
+                    .map((period) =>
+                        PopupMenuItem(value: period, child: Text(period.label)))
+                    .toList(),
+                child: _FilterButton(
+                    icon: Icons.calendar_today_outlined,
+                    label: selectedPeriod == _PeriodFilter.all
+                        ? 'Период'
+                        : selectedPeriod.label),
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: PopupMenuButton<String?>(
+                onSelected: onStatusChanged,
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: null, child: Text('Все статусы')),
+                  PopupMenuItem(value: 'CH', child: Text('Проверено')),
+                  PopupMenuItem(value: 'PR', child: Text('Проверяется')),
+                  PopupMenuItem(value: 'FA', child: Text('Ошибка')),
+                ],
+                child: _FilterButton(
+                    icon: Icons.filter_list_rounded,
+                    label: statusFilter == null
+                        ? 'Статус'
+                        : _statusLabel(statusFilter!)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: InkWell(
+                onTap: onSortChanged,
+                borderRadius: BorderRadius.circular(10),
+                child: _FilterButton(
+                    icon: Icons.sort_rounded,
+                    label: newestFirst ? 'Новые' : 'Старые'),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
+
+  static String _statusLabel(String status) => switch (status) {
+        'CH' => 'Проверено',
+        'PR' => 'Проверяется',
+        'FA' => 'Ошибка',
+        _ => 'Статус',
+      };
 }
 
-class _PageSummary extends StatelessWidget {
-  final int page;
-  final CheckHistoryPage? pageData;
-  final int visibleCount;
+class _FilterButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
 
-  const _PageSummary({
-    required this.page,
-    required this.pageData,
-    required this.visibleCount,
-  });
+  const _FilterButton({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final total = pageData?.total;
-    final totalText = total == null ? '' : ' из $total';
-    return Text(
-      'Страница $page · показано $visibleCount$totalText · сначала новые',
-      style: const TextStyle(
-        color: Color(0xFF64748B),
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: OySynAuthTokens.divider),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 17, color: const Color(0xFF5A6577)),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    color: Color(0xFF5A6577),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }
+}
+
+class _DocumentTabs extends StatelessWidget {
+  const _DocumentTabs();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: _tab('Мои документы', true)),
+        const SizedBox(width: 8),
+        Expanded(child: _tab('Парные проверки', false)),
+      ],
+    );
+  }
+
+  Widget _tab(String label, bool selected) => Container(
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? OySynAuthTokens.primaryBlue : Colors.white,
+          border: Border.all(
+              color: selected
+                  ? OySynAuthTokens.primaryBlue
+                  : OySynAuthTokens.divider),
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                color: selected ? Colors.white : const Color(0xFF5A6577),
+                fontSize: 13,
+                fontWeight: FontWeight.w700)),
+      );
 }
 
 class _PaginationControls extends StatelessWidget {

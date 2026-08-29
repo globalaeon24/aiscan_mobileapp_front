@@ -39,6 +39,37 @@ class _ScanScreenState extends State<ScanScreen> {
   bool _includeOcr = false;
   bool _aiCheck = true;
   bool _loading = false;
+  bool _modulesLoading = true;
+  String? _modulesError;
+  List<CheckModule> _modules = const [];
+  final Set<String> _selectedModules = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadModules();
+  }
+
+  Future<void> _loadModules() async {
+    try {
+      final modules = await ScanService.getCheckModules();
+      if (!mounted) return;
+      setState(() {
+        _modules = modules;
+        _selectedModules
+          ..clear()
+          ..addAll(
+              modules.where((item) => item.selected).map((item) => item.code));
+        _modulesLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _modulesError = error.toString();
+        _modulesLoading = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -87,6 +118,16 @@ class _ScanScreenState extends State<ScanScreen> {
         documentType: _documentType,
         includeOcr: _includeOcr,
         aiCheck: _aiCheck,
+        modules: _modules
+            .where((item) =>
+                item.group == 'base' && _selectedModules.contains(item.code))
+            .map((item) => item.code)
+            .toList(),
+        modulesKz: _modules
+            .where((item) =>
+                item.group == 'kz' && _selectedModules.contains(item.code))
+            .map((item) => item.code)
+            .toList(),
       );
       widget.onScanCompleted?.call(scan);
       if (!mounted) return;
@@ -183,7 +224,12 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
           const SizedBox(height: 13),
-          const _ModulesCard(),
+          _ModulesCard(
+            loading: _modulesLoading,
+            error: _modulesError,
+            selectedCount: _selectedModules.length,
+            onTap: _modulesLoading ? null : _openModules,
+          ),
           const SizedBox(height: 13),
           _SettingsCard(
             includeOcr: _includeOcr,
@@ -214,6 +260,76 @@ class _ScanScreenState extends State<ScanScreen> {
                   )
                 : const Icon(Icons.file_upload_outlined),
             label: Text(_loading ? 'Загрузка...' : 'Загрузить документ'),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openModules() async {
+    if (_modules.isEmpty) {
+      _showMessage(_modulesError ?? 'Нет доступных модулей проверки.');
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.72,
+            child: Column(
+              children: [
+                const Text('Модули проверки',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                const Text('Выберите базы для проверки документа',
+                    style: TextStyle(color: Color(0xFF8A94A6), fontSize: 12.5)),
+                const Divider(height: 24),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _modules.length,
+                    itemBuilder: (_, index) {
+                      final module = _modules[index];
+                      return CheckboxListTile(
+                        value: _selectedModules.contains(module.code),
+                        onChanged: module.required
+                            ? null
+                            : (selected) {
+                                setState(() {
+                                  if (selected == true) {
+                                    _selectedModules.add(module.code);
+                                  } else {
+                                    _selectedModules.remove(module.code);
+                                  }
+                                });
+                                setSheetState(() {});
+                              },
+                        title: Text(module.label,
+                            style: const TextStyle(
+                                fontSize: 13.5, fontWeight: FontWeight.w600)),
+                        subtitle: Text(module.group == 'kz'
+                            ? 'Казахстан'
+                            : 'Основная база'),
+                        secondary: module.required
+                            ? const Icon(Icons.lock_outline_rounded,
+                                size: 18, color: OySynAuthTokens.primaryBlue)
+                            : null,
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: FilledButton(
+                    onPressed: Navigator.of(sheetContext).pop,
+                    child: Text('Готово · выбрано ${_selectedModules.length}'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -445,32 +561,66 @@ class _DocumentTypeField extends StatelessWidget {
 }
 
 class _ModulesCard extends StatelessWidget {
-  const _ModulesCard();
+  final bool loading;
+  final String? error;
+  final int selectedCount;
+  final VoidCallback? onTap;
+
+  const _ModulesCard(
+      {required this.loading,
+      required this.error,
+      required this.selectedCount,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _cardDecoration(),
-      child: const Row(
-        children: [
-          _LeadingIcon(icon: Icons.layers_outlined),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Модули проверки',
-                    style:
-                        TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                SizedBox(height: 2),
-                Text('Набор модулей определяется настройками организации',
-                    style: TextStyle(color: Color(0xFF8A94A6), fontSize: 12)),
-              ],
-            ),
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: _cardDecoration(),
+          child: Row(
+            children: [
+              const _LeadingIcon(icon: Icons.layers_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Модули проверки',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(
+                      loading
+                          ? 'Загрузка доступных модулей…'
+                          : error != null
+                              ? 'Не удалось загрузить модули'
+                              : 'Выбрано модулей: $selectedCount',
+                      style: TextStyle(
+                          color: error != null
+                              ? const Color(0xFFD23B41)
+                              : const Color(0xFF8A94A6),
+                          fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              if (loading)
+                const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+              else
+                const Icon(Icons.chevron_right_rounded,
+                    color: Color(0xFFC3CAD8)),
+            ],
           ),
-          Icon(Icons.chevron_right_rounded, color: Color(0xFFC3CAD8)),
-        ],
+        ),
       ),
     );
   }
