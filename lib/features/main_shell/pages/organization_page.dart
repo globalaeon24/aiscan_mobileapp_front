@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../services/profile_service.dart';
 import '../../../theme/app_theme.dart';
+import 'organization_billing_page.dart';
+import 'organization_users_page.dart';
 
 class OrganizationPage extends StatefulWidget {
   final int? initialOrganizationId;
@@ -93,6 +95,7 @@ class _OrganizationDetails extends StatelessWidget {
     final users = _asInt(organization['users_count']) ?? 0;
     final reports = _asInt(organization['reports_count']) ?? 0;
     final apiSettings = _asInt(organization['api_settings_count']) ?? 0;
+    final organizationBalance = _asInt(organization['checks_available']) ?? 0;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 36),
@@ -162,7 +165,16 @@ class _OrganizationDetails extends StatelessWidget {
               icon: Icons.group_outlined,
               title: 'Пользователи',
               subtitle: '$users сотрудников · роли и доступ',
-              onTap: id == null ? null : () => _showUsers(context, id, title),
+              onTap: id == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => OrganizationUsersPage(
+                            organizationId: id,
+                            organizationName: title,
+                          ),
+                        ),
+                      ),
             ),
             _OrganizationMenuItem(
               icon: Icons.tune_rounded,
@@ -180,7 +192,17 @@ class _OrganizationDetails extends StatelessWidget {
               icon: Icons.credit_card_rounded,
               title: 'Биллинг',
               subtitle: 'Распределение квот сотрудникам',
-              onTap: id == null ? null : () => _showBilling(context, id),
+              onTap: id == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => OrganizationBillingPage(
+                            organizationId: id,
+                            organizationName: title,
+                            organizationBalance: organizationBalance,
+                          ),
+                        ),
+                      ),
             ),
             _OrganizationMenuItem(
               icon: Icons.history_rounded,
@@ -213,21 +235,6 @@ class _OrganizationDetails extends StatelessWidget {
     );
   }
 
-  Future<void> _showUsers(BuildContext context, int id, String title) async {
-    final users = await ProfileService.getOrganizationUsers(id);
-    if (!context.mounted) return;
-    _showDataSheet(
-      context,
-      'Пользователи · $title',
-      users
-          .map((user) => (
-                _text(user['full_name'], 'Без имени'),
-                _text(user['email'], 'Email не указан'),
-              ))
-          .toList(),
-    );
-  }
-
   Future<void> _showApiSettings(BuildContext context, int id) async {
     final data = await ProfileService.getOrganizationApiSettings(id);
     if (!context.mounted) return;
@@ -240,21 +247,6 @@ class _OrganizationDetails extends StatelessWidget {
           .map((token) => (
                 _text(token['name'], 'API-токен'),
                 token['is_active'] == true ? 'Активен' : 'Отключен',
-              ))
-          .toList(),
-    );
-  }
-
-  Future<void> _showBilling(BuildContext context, int id) async {
-    final users = await ProfileService.getOrganizationBilling(id);
-    if (!context.mounted) return;
-    _showDataSheet(
-      context,
-      'Биллинг',
-      users
-          .map((user) => (
-                _text(user['full_name'] ?? user['email'], 'Пользователь'),
-                '${_asInt(user['checks_available']) ?? 0} проверок',
               ))
           .toList(),
     );

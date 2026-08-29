@@ -61,6 +61,31 @@ class ProfileService {
     return data.whereType<Map<String, dynamic>>().toList();
   }
 
+  static Future<Map<String, dynamic>> createOrganizationUser(
+    int organizationId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'POST',
+      '/organizations/$organizationId/users',
+      payload,
+    );
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> updateOrganizationUser(
+    int organizationId,
+    int userId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'PATCH',
+      '/organizations/$organizationId/users/$userId',
+      payload,
+    );
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
   static Future<Map<String, dynamic>> getOrganizationApiSettings(
       int organizationId) async {
     final data = await _get('/organizations/$organizationId/api-settings');
@@ -72,6 +97,19 @@ class ProfileService {
     final data = await _get('/organizations/$organizationId/billing');
     if (data is! List) return const [];
     return data.whereType<Map<String, dynamic>>().toList();
+  }
+
+  static Future<Map<String, dynamic>> updateOrganizationBilling(
+    int organizationId,
+    int userId,
+    int checksAvailable,
+  ) async {
+    final data = await _send(
+      'PATCH',
+      '/organizations/$organizationId/billing/$userId',
+      {'checks_available': checksAvailable},
+    );
+    return data is Map<String, dynamic> ? data : const {};
   }
 
   static Future<List<Map<String, dynamic>>> getOrganizationBillingJournal(
@@ -90,6 +128,27 @@ class ProfileService {
     );
     if (response.statusCode != 200) {
       throw Exception('Не удалось загрузить данные (${response.statusCode}).');
+    }
+    return jsonDecode(response.body);
+  }
+
+  static Future<dynamic> _send(
+    String method,
+    String path,
+    Map<String, dynamic> payload,
+  ) async {
+    final token = await TokenStorage.getToken();
+    if (token == null) throw Exception('Нет токена авторизации.');
+    final request = http.Request(method, Uri.parse('$baseUrl$path'))
+      ..headers.addAll({
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      })
+      ..body = jsonEncode(payload);
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Не удалось сохранить данные (${response.statusCode}).');
     }
     return jsonDecode(response.body);
   }
