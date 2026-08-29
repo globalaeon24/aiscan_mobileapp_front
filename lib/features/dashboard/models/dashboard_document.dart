@@ -38,7 +38,8 @@ class DashboardDocument {
   });
 
   factory DashboardDocument.fromScanResult(ScanResult result) {
-    final statusType = _statusType(result.status);
+    final statusType =
+        result.isStale ? DocumentStatusType.error : _statusType(result.status);
     final originality = result.originalityPercentage.clamp(0, 100).toDouble();
     final ai = result.aiPercentage?.clamp(0, 100).toDouble();
     final author = result.authorName?.trim();
@@ -62,9 +63,11 @@ class DashboardDocument {
       originalityPercent:
           statusType == DocumentStatusType.success ? originality : null,
       aiPercent: statusType == DocumentStatusType.success ? ai : null,
-      statusText: statusType == DocumentStatusType.success
-          ? null
-          : (result.statusDisplay ?? _statusLabel(result.status)),
+      statusText: result.isStale
+          ? 'Проверка не завершена'
+          : statusType == DocumentStatusType.success
+              ? null
+              : (result.statusDisplay ?? _statusLabel(result.status)),
       statusType: statusType,
       createdAt: result.createdAt,
     );

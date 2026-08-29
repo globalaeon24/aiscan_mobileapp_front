@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../storage/token_storage.dart';
-import '../../../theme/app_theme.dart';
 import '../../../services/profile_service.dart';
 import '../../../services/security_service.dart';
+import '../../../storage/token_storage.dart';
+import '../../../theme/app_theme.dart';
+import 'organization_page.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -13,421 +14,439 @@ class UserProfilePage extends StatefulWidget {
 }
 
 class _UserProfilePageState extends State<UserProfilePage> {
-  late Future<Map<String, dynamic>?> _userFuture;
+  late Future<Map<String, dynamic>?> _profile;
+  int _tab = 0;
 
   @override
   void initState() {
     super.initState();
-    _userFuture = _loadUser();
+    _profile = _loadProfile();
   }
 
-  Future<Map<String, dynamic>?> _loadUser() async {
+  Future<Map<String, dynamic>?> _loadProfile() async {
     final cached = await TokenStorage.getUser();
     try {
       final fresh = await ProfileService.getProfile();
       if (fresh.isNotEmpty) {
-        final enriched = await _withOrganization(fresh);
-        await TokenStorage.saveUser(enriched);
-        return enriched;
+        await TokenStorage.saveUser(fresh);
+        return fresh;
       }
-    } catch (_) {
-      // Cached profile is enough for rendering this page.
-    }
+    } catch (_) {}
     return cached;
   }
 
-  Future<Map<String, dynamic>> _withOrganization(
-    Map<String, dynamic> user,
-  ) async {
-    final organizationId = _asInt(
-      user['organization_id'] ??
-          user['core_organization_id'] ??
-          user['organization']?['id'],
-    );
-    if (organizationId == null) return user;
-
-    try {
-      final organization = await ProfileService.getOrganization(organizationId);
-      if (organization.isEmpty) return user;
-
-      return {
-        ...user,
-        'organization_name': organization['name'] ??
-            organization['title'] ??
-            organization['organization_name'] ??
-            user['organization_name'],
-        'organization': organization,
-      };
-    } catch (_) {
-      return user;
-    }
-  }
-
-  int? _asInt(dynamic value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return int.tryParse(value?.toString() ?? '');
-  }
-
-  Future<void> _logout(BuildContext context) async {
+  Future<void> _logout() async {
     await TokenStorage.clear();
     await SecurityService.clear();
-    if (!context.mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 96),
-      children: [
-        Text(
-          'Профиль',
-          style: OySynTextStyles.sectionTitle,
-        ),
-        const SizedBox(height: 18),
-        FutureBuilder<Map<String, dynamic>?>(
-          future: _userFuture,
-          builder: (context, snapshot) {
-            final user = snapshot.data;
-            if (snapshot.connectionState == ConnectionState.waiting &&
-                user == null) {
-              return const _ProfileSkeleton();
-            }
-
-            return _ProfileContent(user: user);
-          },
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: () => _logout(context),
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Выйти'),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProfileContent extends StatelessWidget {
-  final Map<String, dynamic>? user;
-
-  const _ProfileContent({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    final fullName = TokenStorage.displayName(user);
-    final email = _value(user, 'email');
-    final role = _roleLabel(_value(user, 'role'));
-    final organization = _organizationName(user);
-    final checksAvailable = _value(user, 'checks_available');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: const Color(0xFFEAF0FF),
-                child: Text(
-                  TokenStorage.initials(user),
-                  style: const TextStyle(
-                    color: OySynAuthTokens.primaryBlue,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _profile,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            snapshot.data == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final user = snapshot.data ?? const <String, dynamic>{};
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
+          children: [
+            _PageHeader(balance: _int(user['checks_available'])),
+            const SizedBox(height: 18),
+            _IdentityCard(user: user),
+            const SizedBox(height: 16),
+            _Tabs(
+                selected: _tab,
+                onChanged: (value) => setState(() => _tab = value)),
+            const SizedBox(height: 16),
+            switch (_tab) {
+              0 => _AccountCard(user: user),
+              1 => _InfoCard(
+                  icon: Icons.bar_chart_rounded,
+                  title: 'Статистика',
+                  text:
+                      'Всего завершено проверок: ${_int(user['checks_completed'])}'),
+              2 => const _InfoCard(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Уведомления',
+                  text:
+                      'Настройки уведомлений будут подключены после расширения API Core.'),
+              _ => const _InfoCard(
+                  icon: Icons.shield_outlined,
+                  title: 'Защита аккаунта',
+                  text: 'PIN-код, биометрия и активные сессии.'),
+            },
+            const SizedBox(height: 14),
+            _NavigationCard(
+              icon: Icons.business_outlined,
+              title: 'Организация',
+              subtitle: _text(user['organization_name'], 'Данные и управление'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => OrganizationPage(
+                      initialOrganizationId:
+                          _nullableInt(user['organization_id'])),
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      fullName,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF111827),
-                        fontSize: 19,
-                        height: 1.15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      email,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFFBFF),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFDCEBFF)),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.fact_check_outlined,
-                color: OySynAuthTokens.primaryBlue,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Доступные проверки',
-                  style: TextStyle(
-                    color: Color(0xFF2F3B48),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Text(
-                checksAvailable,
-                style: const TextStyle(
-                  color: OySynAuthTokens.primaryBlue,
-                  fontSize: 24,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: _ProfileMenuItem(
-            icon: Icons.devices_rounded,
-            title: 'Связанные устройства',
-            subtitle: 'Веб-сессии, открытые через QR',
-            onTap: () => Navigator.of(context).pushNamed('/linked-devices'),
-          ),
-        ),
-        const SizedBox(height: 14),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              _ProfileField(
-                icon: Icons.badge_outlined,
-                label: 'Роль',
-                value: role,
-              ),
-              const _ProfileDivider(),
-              _ProfileField(
-                icon: Icons.business_outlined,
-                label: 'Организация',
-                value: organization,
-              ),
-              const _ProfileDivider(),
-              _ProfileField(
-                icon: Icons.mail_outline_rounded,
-                label: 'Email',
-                value: email,
-              ),
-              const _ProfileDivider(),
-              _ProfileField(
-                icon: Icons.person_outline_rounded,
-                label: 'ФИО',
-                value: fullName,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  static String _value(Map<String, dynamic>? user, String key) {
-    final value = user?[key];
-    final text = value?.toString().trim();
-    return text == null || text.isEmpty ? 'Не указано' : text;
-  }
-
-  static String _organizationName(Map<String, dynamic>? user) {
-    final value = user?['organization_name'] ??
-        user?['organization']?['name'] ??
-        user?['organization']?['title'];
-    final text = value?.toString().trim();
-    return text == null || text.isEmpty ? 'Не указано' : text;
-  }
-
-  static String _roleLabel(String role) {
-    return switch (role) {
-      'EXP' => 'Expert',
-      'MOD' => 'Moderator',
-      'SUP' => 'Supervisor',
-      'ADM' => 'Administrator',
-      _ => role,
-    };
-  }
-}
-
-class _ProfileField extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _ProfileField({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: OySynAuthTokens.iconGrey, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Color(0xFF6B7280),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Color(0xFF111827),
-                    fontSize: 15,
-                    height: 1.25,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
             ),
+            const SizedBox(height: 10),
+            _NavigationCard(
+              icon: Icons.devices_rounded,
+              title: 'Связанные устройства',
+              subtitle: 'Активные веб-сессии',
+              onTap: () => Navigator.of(context).pushNamed('/linked-devices'),
+            ),
+            const SizedBox(height: 14),
+            TextButton.icon(
+              onPressed: _logout,
+              style: TextButton.styleFrom(
+                alignment: Alignment.centerLeft,
+                foregroundColor: const Color(0xFFDF3E48),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                textStyle:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Выйти из аккаунта'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PageHeader extends StatelessWidget {
+  final int balance;
+  const _PageHeader({required this.balance});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          const Expanded(child: Text('Профиль', style: _pageTitle)),
+          Container(
+            height: 46,
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            decoration: _card(radius: 14),
+            child: Row(children: [
+              const Icon(Icons.wallet_outlined, size: 19),
+              const SizedBox(width: 8),
+              Text('$balance',
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800)),
+            ]),
           ),
         ],
-      ),
+      );
+}
+
+class _IdentityCard extends StatelessWidget {
+  final Map<String, dynamic> user;
+  const _IdentityCard({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final joined = _memberSince(user['date_joined']);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _card(),
+      child: Column(children: [
+        Row(children: [
+          CircleAvatar(
+            radius: 31,
+            backgroundColor: const Color(0xFF3263E6),
+            child: Text(TokenStorage.initials(user),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(TokenStorage.displayName(user),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _cardTitle),
+                const SizedBox(height: 3),
+                Text(_text(user['email'], 'Email не указан'), style: _muted),
+                if (joined.isNotEmpty) Text(joined, style: _muted),
+              ])),
+        ]),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(
+              child: _Metric(
+                  value: '${_int(user['checks_available'])}',
+                  label: 'проверок осталось',
+                  blue: true)),
+          const SizedBox(width: 10),
+          Expanded(
+              child: _Metric(
+                  value: '${_int(user['checks_completed'])}',
+                  label: 'всего проверено')),
+        ]),
+      ]),
     );
   }
 }
 
-class _ProfileMenuItem extends StatelessWidget {
+class _Metric extends StatelessWidget {
+  final String value;
+  final String label;
+  final bool blue;
+  const _Metric({required this.value, required this.label, this.blue = false});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 84,
+        decoration: BoxDecoration(
+            color: const Color(0xFFF4F7FF),
+            borderRadius: BorderRadius.circular(14)),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text(value,
+              style: TextStyle(
+                  color: blue
+                      ? OySynAuthTokens.deepBlue
+                      : OySynAuthTokens.textDark,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900)),
+          Text(label, style: _muted),
+        ]),
+      );
+}
+
+class _Tabs extends StatelessWidget {
+  final int selected;
+  final ValueChanged<int> onChanged;
+  const _Tabs({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Профиль', 'Статистика', 'Уведомл.', 'Защита'];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+          children: List.generate(labels.length, (index) {
+        final active = selected == index;
+        return Padding(
+          padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 8),
+          child: InkWell(
+            onTap: () => onChanged(index),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active ? OySynAuthTokens.primaryBlue : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: active
+                        ? OySynAuthTokens.primaryBlue
+                        : OySynAuthTokens.divider),
+              ),
+              child: Text(labels[index],
+                  style: TextStyle(
+                      color: active ? Colors.white : const Color(0xFF5C677B),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800)),
+            ),
+          ),
+        );
+      })),
+    );
+  }
+}
+
+class _AccountCard extends StatelessWidget {
+  final Map<String, dynamic> user;
+  const _AccountCard({required this.user});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        decoration: _card(),
+        child: Column(children: [
+          const Row(children: [
+            Expanded(child: Text('Учётные данные', style: _sectionTitle)),
+            Icon(Icons.edit_outlined,
+                color: OySynAuthTokens.primaryBlue, size: 19),
+            SizedBox(width: 5),
+            Text('Изменить',
+                style: TextStyle(
+                    color: OySynAuthTokens.primaryBlue,
+                    fontWeight: FontWeight.w800)),
+          ]),
+          const Divider(height: 22, color: OySynAuthTokens.divider),
+          _DataRow(
+              label: 'Фамилия', value: _text(user['last_name'], 'Не указано')),
+          _DataRow(
+              label: 'Имя', value: _text(user['first_name'], 'Не указано')),
+          _DataRow(
+              label: 'Отчество',
+              value: _text(user['middle_name'], 'Не указано')),
+          _DataRow(
+              label: 'Телефон',
+              value: _text(user['phone_number'], 'Не указано')),
+          _DataRow(
+              label: 'Эл. почта',
+              value: _text(user['email'], 'Не указано'),
+              last: true),
+        ]),
+      );
+}
+
+class _DataRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool last;
+  const _DataRow({required this.label, required this.value, this.last = false});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+            border: last
+                ? null
+                : const Border(
+                    bottom: BorderSide(color: OySynAuthTokens.divider))),
+        child: Row(children: [
+          Expanded(child: Text(label, style: _muted)),
+          const SizedBox(width: 12),
+          Flexible(
+              child: Text(value,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                      color: OySynAuthTokens.textDark,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800))),
+        ]),
+      );
+}
+
+class _InfoCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String text;
+  const _InfoCard(
+      {required this.icon, required this.title, required this.text});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: _card(),
+        child: Row(children: [
+          Icon(icon, color: OySynAuthTokens.primaryBlue, size: 30),
+          const SizedBox(width: 14),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title, style: _sectionTitle),
+                const SizedBox(height: 4),
+                Text(text, style: _muted)
+              ])),
+        ]),
+      );
+}
+
+class _NavigationCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
-  const _ProfileMenuItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
+  const _NavigationCard(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      leading: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: const Color(0xFFEAF0FF),
-          borderRadius: BorderRadius.circular(21),
-        ),
-        child: Icon(icon, color: OySynAuthTokens.primaryBlue, size: 23),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: OySynAuthTokens.textDark,
-          fontSize: 15,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 3),
-        child: Text(
-          subtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: OySynAuthTokens.textMuted,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+  Widget build(BuildContext context) => Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFEAF0FF),
+                      borderRadius: BorderRadius.circular(12)),
+                  child: Icon(icon, color: OySynAuthTokens.primaryBlue)),
+              const SizedBox(width: 13),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: _muted)
+                  ])),
+              const Icon(Icons.chevron_right_rounded, color: Color(0xFFB5BECE)),
+            ]),
           ),
         ),
-      ),
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-        color: OySynAuthTokens.iconGrey,
-      ),
-    );
-  }
+      );
 }
 
-class _ProfileDivider extends StatelessWidget {
-  const _ProfileDivider();
+const _pageTitle = TextStyle(
+    color: OySynAuthTokens.textDark, fontSize: 26, fontWeight: FontWeight.w800);
+const _cardTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 19,
+    height: 1.12,
+    fontWeight: FontWeight.w800);
+const _sectionTitle = TextStyle(
+    color: OySynAuthTokens.textDark, fontSize: 17, fontWeight: FontWeight.w800);
+const _muted = TextStyle(
+    color: OySynAuthTokens.textMuted,
+    fontSize: 14,
+    height: 1.25,
+    fontWeight: FontWeight.w600);
 
-  @override
-  Widget build(BuildContext context) {
-    return const Divider(
-      height: 1,
-      thickness: 1,
-      color: OySynAuthTokens.divider,
-      indent: 50,
-      endIndent: 16,
-    );
-  }
+BoxDecoration _card({double radius = 16}) => BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: OySynAuthTokens.divider));
+
+int _int(dynamic value) =>
+    value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0;
+int? _nullableInt(dynamic value) => value == null ? null : _int(value);
+String _text(dynamic value, String fallback) {
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? fallback : text;
 }
 
-class _ProfileSkeleton extends StatelessWidget {
-  const _ProfileSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 92,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Center(child: CircularProgressIndicator()),
-    );
-  }
+String _memberSince(dynamic value) {
+  final date = DateTime.tryParse(value?.toString() ?? '');
+  if (date == null) return '';
+  const months = [
+    'января',
+    'февраля',
+    'марта',
+    'апреля',
+    'мая',
+    'июня',
+    'июля',
+    'августа',
+    'сентября',
+    'октября',
+    'ноября',
+    'декабря'
+  ];
+  return 'Участник с ${months[date.month - 1]} ${date.year}';
 }

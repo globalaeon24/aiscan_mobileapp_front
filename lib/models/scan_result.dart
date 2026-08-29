@@ -26,6 +26,7 @@ class ScanResult {
   final String? title;
   final String? status;
   final String? statusDisplay;
+  final bool isStale;
   final String? documentType;
 
   // 🔥 МЕТАДАННЫЕ
@@ -57,6 +58,7 @@ class ScanResult {
     this.title,
     this.status,
     this.statusDisplay,
+    this.isStale = false,
     this.documentType,
     this.userScanIndex,
     this.fileName,
@@ -78,6 +80,7 @@ class ScanResult {
       title: json['title']?.toString(),
       status: json['status']?.toString(),
       statusDisplay: json['status_display']?.toString(),
+      isStale: json['is_stale'] == true,
       documentType: json['document_type_display']?.toString() ??
           json['document_type']?.toString(),
       userScanIndex: _asNullableInt(json['user_scan_index']),
