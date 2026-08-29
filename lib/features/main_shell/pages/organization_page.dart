@@ -14,6 +14,7 @@ class OrganizationPage extends StatefulWidget {
 
 class _OrganizationPageState extends State<OrganizationPage> {
   late Future<List<Map<String, dynamic>>> _future;
+  int? _selectedOrganizationId;
 
   @override
   void initState() {
@@ -43,7 +44,11 @@ class _OrganizationPageState extends State<OrganizationPage> {
               return const _EmptyState();
             }
             final selected = _selectOrganization(organizations);
-            return _OrganizationDetails(organization: selected);
+            return _OrganizationDetails(
+              organization: selected,
+              organizations: organizations,
+              onSelected: (id) => setState(() => _selectedOrganizationId = id),
+            );
           },
         ),
       ),
@@ -52,7 +57,7 @@ class _OrganizationPageState extends State<OrganizationPage> {
 
   Map<String, dynamic> _selectOrganization(
       List<Map<String, dynamic>> organizations) {
-    final wanted = widget.initialOrganizationId;
+    final wanted = _selectedOrganizationId ?? widget.initialOrganizationId;
     if (wanted != null) {
       for (final organization in organizations) {
         if (_asInt(organization['id']) == wanted) return organization;
@@ -64,8 +69,14 @@ class _OrganizationPageState extends State<OrganizationPage> {
 
 class _OrganizationDetails extends StatelessWidget {
   final Map<String, dynamic> organization;
+  final List<Map<String, dynamic>> organizations;
+  final ValueChanged<int> onSelected;
 
-  const _OrganizationDetails({required this.organization});
+  const _OrganizationDetails({
+    required this.organization,
+    required this.organizations,
+    required this.onSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +101,32 @@ class _OrganizationDetails extends StatelessWidget {
               onTap: () => Navigator.of(context).pop(),
             ),
             const SizedBox(width: 18),
-            const Text('Организация', style: _Styles.pageTitle),
+            const Expanded(
+              child: Text('Организация', style: _Styles.pageTitle),
+            ),
+            if (organizations.length > 1)
+              PopupMenuButton<int>(
+                tooltip: 'Выбрать организацию',
+                icon: const Icon(Icons.swap_horiz_rounded),
+                onSelected: onSelected,
+                itemBuilder: (context) => organizations
+                    .map(
+                      (item) => PopupMenuItem<int>(
+                        value: _asInt(item['id']),
+                        child: SizedBox(
+                          width: 260,
+                          child: Text(
+                            _text(item['title'], 'Организация'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    )
+                    .where((item) => item.value != null)
+                    .cast<PopupMenuEntry<int>>()
+                    .toList(),
+              ),
           ],
         ),
         const SizedBox(height: 24),
