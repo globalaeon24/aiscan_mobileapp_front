@@ -132,7 +132,10 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    _UploadAction(onTap: widget.onCheck),
+                    _UploadAction(
+                      onTap: widget.onCheck,
+                      enabled: data == null || data.checksAvailable > 0,
+                    ),
                     const SizedBox(height: 14),
                     MonthSummaryCard(
                       totalDocuments: data?.totalDocuments ?? 0,
@@ -216,13 +219,14 @@ class _DashboardData {
 
 class _UploadAction extends StatelessWidget {
   final VoidCallback onTap;
+  final bool enabled;
 
-  const _UploadAction({required this.onTap});
+  const _UploadAction({required this.onTap, required this.enabled});
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: enabled ? Colors.white : const Color(0xFFF5F6FA),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -232,7 +236,11 @@ class _UploadAction extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFBFD0F5), width: 2),
+            border: Border.all(
+              color:
+                  enabled ? const Color(0xFFBFD0F5) : OySynAuthTokens.divider,
+              width: 2,
+            ),
           ),
           child: Column(
             children: [
@@ -240,16 +248,21 @@ class _UploadAction extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF3E7BFF), Color(0xFF2F5FE0)],
-                  ),
+                  color: enabled ? null : const Color(0xFFD8DEEA),
+                  gradient: enabled
+                      ? const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF3E7BFF), Color(0xFF2F5FE0)],
+                        )
+                      : null,
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color:
-                          OySynAuthTokens.primaryBlue.withValues(alpha: 0.28),
+                      color: (enabled
+                              ? OySynAuthTokens.primaryBlue
+                              : Colors.transparent)
+                          .withValues(alpha: 0.28),
                       blurRadius: 18,
                       offset: const Offset(0, 10),
                     ),
@@ -259,14 +272,23 @@ class _UploadAction extends StatelessWidget {
                     color: Colors.white, size: 27),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Проверить документ',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              Text(
+                enabled ? 'Проверить документ' : 'Лимит проверок исчерпан',
+                style: TextStyle(
+                  color: enabled
+                      ? OySynAuthTokens.textDark
+                      : OySynAuthTokens.textMuted,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Перетащите или выберите файл · PDF, DOCX, TXT',
-                style: TextStyle(color: Color(0xFF8A94A6), fontSize: 12.5),
+              Text(
+                enabled
+                    ? 'Перетащите или выберите файл · PDF, DOCX, TXT'
+                    : 'Обратитесь к администратору организации',
+                style:
+                    const TextStyle(color: Color(0xFF8A94A6), fontSize: 12.5),
               ),
             ],
           ),

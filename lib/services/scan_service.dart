@@ -142,8 +142,21 @@ class ScanService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return ScanResult.fromJson(jsonDecode(body));
     } else {
-      throw Exception(
-          "Ошибка загрузки документа: ${response.statusCode} $body");
+      var message = 'Не удалось загрузить документ.';
+      try {
+        final payload = jsonDecode(body);
+        if (payload is Map<String, dynamic>) {
+          final detail = payload['detail'] ?? payload['error'];
+          if (detail is String && detail.trim().isNotEmpty) {
+            message = detail.trim();
+          }
+        }
+      } catch (_) {}
+      if (response.statusCode == 402 || response.statusCode == 403) {
+        message =
+            'Лимит проверок исчерпан. Обратитесь к администратору организации.';
+      }
+      throw Exception(message);
     }
   }
 

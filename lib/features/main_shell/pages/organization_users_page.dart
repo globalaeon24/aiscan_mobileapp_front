@@ -204,9 +204,12 @@ class _OrganizationUsersPageState extends State<OrganizationUsersPage> {
   }
 
   Future<void> _editUser(Map<String, dynamic>? user) async {
-    final saved = await showDialog<bool>(
+    final saved = await showModalBottomSheet<bool>(
       context: context,
-      builder: (context) => _UserEditorDialog(
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _UserEditorSheet(
         organizationId: widget.organizationId,
         user: user,
       ),
@@ -431,15 +434,15 @@ class _StatusBadge extends StatelessWidget {
               color: color, fontSize: 12, fontWeight: FontWeight.w800)));
 }
 
-class _UserEditorDialog extends StatefulWidget {
+class _UserEditorSheet extends StatefulWidget {
   final int organizationId;
   final Map<String, dynamic>? user;
-  const _UserEditorDialog({required this.organizationId, this.user});
+  const _UserEditorSheet({required this.organizationId, this.user});
   @override
-  State<_UserEditorDialog> createState() => _UserEditorDialogState();
+  State<_UserEditorSheet> createState() => _UserEditorSheetState();
 }
 
-class _UserEditorDialogState extends State<_UserEditorDialog> {
+class _UserEditorSheetState extends State<_UserEditorSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _email;
   late final TextEditingController _firstName;
@@ -503,63 +506,226 @@ class _UserEditorDialogState extends State<_UserEditorDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-        title: Text(widget.user == null
-            ? 'Добавить сотрудника'
-            : 'Редактировать сотрудника'),
-        content: SizedBox(
-            width: 380,
-            child: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  TextFormField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(labelText: 'Email'),
-                      validator: (value) =>
-                          value == null || !value.contains('@')
-                              ? 'Укажите email'
-                              : null),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                      controller: _firstName,
-                      decoration: const InputDecoration(labelText: 'Имя')),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                      controller: _lastName,
-                      decoration: const InputDecoration(labelText: 'Фамилия')),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                      initialValue: _role,
-                      decoration: const InputDecoration(labelText: 'Роль'),
-                      items: const ['MOD', 'SUP', 'EXP', 'ADM', 'AUT', 'DEC']
-                          .map((role) => DropdownMenuItem(
-                              value: role, child: Text(_roleLabel(role))))
-                          .toList(),
-                      onChanged: (value) =>
-                          setState(() => _role = value ?? _role)),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                      controller: _password,
-                      obscureText: true,
-                      decoration: InputDecoration(
-                          labelText: widget.user == null
-                              ? 'Пароль'
-                              : 'Новый пароль (необязательно)'),
-                      validator: (value) => widget.user == null &&
-                              (value == null || value.length < 6)
-                          ? 'Минимум 6 символов'
-                          : null),
-                ])))),
-        actions: [
-          TextButton(
-              onPressed: _saving ? null : () => Navigator.of(context).pop(),
-              child: const Text('Отмена')),
-          FilledButton(
-              onPressed: _saving ? null : _save,
-              child: Text(_saving ? 'Сохранение...' : 'Сохранить'))
-        ],
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
+        decoration: const BoxDecoration(
+          color: OySynAuthTokens.appBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              margin: const EdgeInsets.only(top: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD3E2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 12, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8EEFF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.manage_accounts_outlined,
+                      color: OySynAuthTokens.primaryBlue,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.user == null
+                              ? 'Добавить сотрудника'
+                              : 'Редактировать сотрудника',
+                          style: _Styles.pageTitle,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.user == null
+                              ? 'Создайте учётную запись и назначьте роль'
+                              : 'Обновите данные, роль или пароль',
+                          style: _Styles.subtitle,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Закрыть',
+                    onPressed:
+                        _saving ? null : () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: OySynAuthTokens.divider),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _EditorLabel('Email'),
+                      TextFormField(
+                        controller: _email,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          hintText: 'name@example.com',
+                          prefixIcon: Icon(Icons.mail_outline_rounded),
+                        ),
+                        validator: (value) =>
+                            value == null || !value.contains('@')
+                                ? 'Укажите корректный email'
+                                : null,
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _EditorLabel('Имя'),
+                                TextFormField(
+                                  controller: _firstName,
+                                  decoration:
+                                      const InputDecoration(hintText: 'Имя'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _EditorLabel('Фамилия'),
+                                TextFormField(
+                                  controller: _lastName,
+                                  decoration: const InputDecoration(
+                                      hintText: 'Фамилия'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      _EditorLabel('Роль в организации'),
+                      DropdownButtonFormField<String>(
+                        initialValue: _role,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.badge_outlined),
+                        ),
+                        items: const ['MOD', 'SUP', 'EXP', 'ADM', 'AUT', 'DEC']
+                            .map((role) => DropdownMenuItem(
+                                value: role, child: Text(_roleLabel(role))))
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _role = value ?? _role),
+                      ),
+                      const SizedBox(height: 14),
+                      _EditorLabel(
+                          widget.user == null ? 'Пароль' : 'Новый пароль'),
+                      TextFormField(
+                        controller: _password,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          hintText: widget.user == null
+                              ? 'Минимум 6 символов'
+                              : 'Оставьте пустым, чтобы не менять',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                        ),
+                        validator: (value) => widget.user == null &&
+                                (value == null || value.length < 6)
+                            ? 'Минимум 6 символов'
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: OySynAuthTokens.divider)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed:
+                          _saving ? null : () => Navigator.of(context).pop(),
+                      child: const Text('Отмена'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 17,
+                              height: 17,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.check_rounded),
+                      label: Text(_saving ? 'Сохранение...' : 'Сохранить'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditorLabel extends StatelessWidget {
+  final String text;
+  const _EditorLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(left: 2, bottom: 6),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF3B475F),
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       );
 }
 

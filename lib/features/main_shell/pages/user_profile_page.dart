@@ -249,37 +249,48 @@ class _Tabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const labels = ['Профиль', 'Статистика', 'Уведомл.', 'Защита'];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-          children: List.generate(labels.length, (index) {
+    return Row(
+      children: List.generate(labels.length, (index) {
         final active = selected == index;
-        return Padding(
-          padding: EdgeInsets.only(right: index == labels.length - 1 ? 0 : 8),
-          child: InkWell(
-            onTap: () => onChanged(index),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: active ? OySynAuthTokens.primaryBlue : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: active
-                        ? OySynAuthTokens.primaryBlue
-                        : OySynAuthTokens.divider),
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(
+              right: index == labels.length - 1 ? 0 : 7,
+            ),
+            child: InkWell(
+              onTap: () => onChanged(index),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 42,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: active ? OySynAuthTokens.primaryBlue : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: active
+                          ? OySynAuthTokens.primaryBlue
+                          : OySynAuthTokens.divider),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      labels[index],
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: active ? Colors.white : const Color(0xFF5C677B),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              child: Text(labels[index],
-                  style: TextStyle(
-                      color: active ? Colors.white : const Color(0xFF5C677B),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800)),
             ),
           ),
         );
-      })),
+      }),
     );
   }
 }

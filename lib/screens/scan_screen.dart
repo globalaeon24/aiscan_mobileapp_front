@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models/scan_result.dart';
+import '../services/profile_service.dart';
 import '../services/scan_service.dart';
 import '../theme/app_theme.dart';
 import 'scan_details_screen.dart';
@@ -39,6 +40,8 @@ class _ScanScreenState extends State<ScanScreen> {
   bool _includeOcr = false;
   bool _aiCheck = true;
   bool _loading = false;
+  bool _balanceLoading = true;
+  int? _checksAvailable;
   bool _modulesLoading = true;
   String? _modulesError;
   List<CheckModule> _modules = const [];
@@ -48,6 +51,20 @@ class _ScanScreenState extends State<ScanScreen> {
   void initState() {
     super.initState();
     _loadModules();
+    _loadBalance();
+  }
+
+  Future<void> _loadBalance() async {
+    try {
+      final profile = await ProfileService.getProfile();
+      if (!mounted) return;
+      setState(() {
+        _checksAvailable = _asInt(profile['checks_available']);
+        _balanceLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _balanceLoading = false);
+    }
   }
 
   Future<void> _loadModules() async {
@@ -102,6 +119,19 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   Future<void> _upload() async {
+    try {
+      final profile = await ProfileService.getProfile();
+      final available = _asInt(profile['checks_available']);
+      if (mounted) setState(() => _checksAvailable = available);
+      if (available <= 0) {
+        _showMessage(
+          'Лимит проверок исчерпан. Обратитесь к администратору организации.',
+        );
+        return;
+      }
+    } catch (_) {
+      // Сервер повторно проверит лимит перед созданием проверки.
+    }
     final file = _file;
     if (file == null) {
       _showMessage('Сначала выберите документ.');
@@ -237,6 +267,10 @@ class _ScanScreenState extends State<ScanScreen> {
             onOcrChanged: (value) => setState(() => _includeOcr = value),
             onAiChanged: (value) => setState(() => _aiCheck = value),
           ),
+          if (!_balanceLoading && (_checksAvailable ?? 1) <= 0) ...[
+            const SizedBox(height: 13),
+            const _LimitNotice(),
+          ],
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -248,7 +282,10 @@ class _ScanScreenState extends State<ScanScreen> {
             border: Border(top: BorderSide(color: OySynAuthTokens.divider)),
           ),
           child: FilledButton.icon(
-            onPressed: _loading ? null : _upload,
+            onPressed:
+                _loading || _balanceLoading || (_checksAvailable ?? 1) <= 0
+                    ? null
+                    : _upload,
             icon: _loading
                 ? const SizedBox(
                     width: 18,
@@ -259,7 +296,13 @@ class _ScanScreenState extends State<ScanScreen> {
                     ),
                   )
                 : const Icon(Icons.file_upload_outlined),
-            label: Text(_loading ? 'Загрузка...' : 'Загрузить документ'),
+            label: Text(
+              _loading
+                  ? 'Загрузка...'
+                  : (_checksAvailable ?? 1) <= 0
+                      ? 'Лимит проверок исчерпан'
+                      : 'Загрузить документ',
+            ),
           ),
         ),
       ),
@@ -271,63 +314,300 @@ class _ScanScreenState extends State<ScanScreen> {
       _showMessage(_modulesError ?? 'Нет доступных модулей проверки.');
       return;
     }
-    await showModalBottomSheet<void>(
+    final selected = await showModalBottomSheet<Set<String>>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: SizedBox(
-            height: MediaQuery.sizeOf(context).height * 0.72,
-            child: Column(
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ModulePickerSheet(
+        modules: _modules,
+        selected: _selectedModules,
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        _selectedModules
+          ..clear()
+          ..addAll(selected);
+      });
+    }
+  }
+}
+
+class _LimitNotice extends StatelessWidget {
+  const _LimitNotice();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF4E3),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFFFD99B)),
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline_rounded,
+                color: Color(0xFFC87900), size: 21),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Лимит проверок исчерпан. Новая загрузка станет доступна после распределения проверок администратором организации.',
+                style: TextStyle(
+                  color: Color(0xFF8B5B10),
+                  fontSize: 12.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _ModulePickerSheet extends StatefulWidget {
+  final List<CheckModule> modules;
+  final Set<String> selected;
+
+  const _ModulePickerSheet({required this.modules, required this.selected});
+
+  @override
+  State<_ModulePickerSheet> createState() => _ModulePickerSheetState();
+}
+
+class _ModulePickerSheetState extends State<_ModulePickerSheet> {
+  late final Set<String> _selected = {...widget.selected};
+
+  @override
+  Widget build(BuildContext context) {
+    final base = widget.modules.where((item) => item.group != 'kz').toList();
+    final kz = widget.modules.where((item) => item.group == 'kz').toList();
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.82,
+      decoration: const BoxDecoration(
+        color: OySynAuthTokens.appBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 42,
+            height: 4,
+            margin: const EdgeInsets.only(top: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFCBD3E2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 12, 12),
+            child: Row(
               children: [
-                const Text('Модули проверки',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 4),
-                const Text('Выберите базы для проверки документа',
-                    style: TextStyle(color: Color(0xFF8A94A6), fontSize: 12.5)),
-                const Divider(height: 24),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8EEFF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.layers_outlined,
+                    color: OySynAuthTokens.primaryBlue,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Модули проверки',
+                        style: TextStyle(
+                          color: OySynAuthTokens.textDark,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Выберите источники для поиска совпадений',
+                        style: TextStyle(
+                          color: OySynAuthTokens.textMuted,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Закрыть',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF0FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_outline_rounded,
+                    size: 19, color: OySynAuthTokens.primaryBlue),
+                const SizedBox(width: 9),
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: _modules.length,
-                    itemBuilder: (_, index) {
-                      final module = _modules[index];
-                      return CheckboxListTile(
-                        value: _selectedModules.contains(module.code),
-                        onChanged: module.required
-                            ? null
-                            : (selected) {
-                                setState(() {
-                                  if (selected == true) {
-                                    _selectedModules.add(module.code);
-                                  } else {
-                                    _selectedModules.remove(module.code);
-                                  }
-                                });
-                                setSheetState(() {});
-                              },
-                        title: Text(module.label,
-                            style: const TextStyle(
-                                fontSize: 13.5, fontWeight: FontWeight.w600)),
-                        subtitle: Text(module.group == 'kz'
-                            ? 'Казахстан'
-                            : 'Основная база'),
-                        secondary: module.required
-                            ? const Icon(Icons.lock_outline_rounded,
-                                size: 18, color: OySynAuthTokens.primaryBlue)
-                            : null,
-                      );
-                    },
+                  child: Text(
+                    'Выбрано ${_selected.length} из ${widget.modules.length}',
+                    style: const TextStyle(
+                      color: OySynAuthTokens.deepBlue,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: FilledButton(
-                    onPressed: Navigator.of(sheetContext).pop,
-                    child: Text('Готово · выбрано ${_selectedModules.length}'),
+                TextButton(
+                  onPressed: _selectRecommended,
+                  child: const Text('Рекомендуемые'),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              children: [
+                if (base.isNotEmpty) ...[
+                  const _ModuleGroupTitle(
+                    title: 'Основные источники',
+                    icon: Icons.public_rounded,
+                  ),
+                  const SizedBox(height: 8),
+                  ...base.map(_moduleTile),
+                ],
+                if (kz.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const _ModuleGroupTitle(
+                    title: 'Казахстанские источники',
+                    icon: Icons.account_balance_outlined,
+                  ),
+                  const SizedBox(height: 8),
+                  ...kz.map(_moduleTile),
+                ],
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: OySynAuthTokens.divider)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Отмена'),
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: FilledButton.icon(
+                    onPressed: () => Navigator.of(context).pop(_selected),
+                    icon: const Icon(Icons.check_rounded),
+                    label: Text('Применить · ${_selected.length}'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _moduleTile(CheckModule module) {
+    final selected = _selected.contains(module.code);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: selected ? const Color(0xFFF1F5FF) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: module.required ? null : () => _toggle(module),
+          borderRadius: BorderRadius.circular(14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected
+                    ? const Color(0xFFB9CBFF)
+                    : OySynAuthTokens.divider,
+              ),
+            ),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? OySynAuthTokens.primaryBlue
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(
+                      color: selected
+                          ? OySynAuthTokens.primaryBlue
+                          : const Color(0xFFB9C2D3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(Icons.check_rounded,
+                          color: Colors.white, size: 17)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        module.label,
+                        style: const TextStyle(
+                          color: OySynAuthTokens.textDark,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (module.required) ...[
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Обязательный модуль',
+                          style: TextStyle(
+                            color: OySynAuthTokens.primaryBlue,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (module.required)
+                  const Icon(Icons.lock_outline_rounded,
+                      size: 18, color: OySynAuthTokens.primaryBlue),
               ],
             ),
           ),
@@ -335,6 +615,44 @@ class _ScanScreenState extends State<ScanScreen> {
       ),
     );
   }
+
+  void _toggle(CheckModule module) {
+    setState(() {
+      if (!_selected.add(module.code)) _selected.remove(module.code);
+    });
+  }
+
+  void _selectRecommended() {
+    setState(() {
+      _selected
+        ..clear()
+        ..addAll(widget.modules
+            .where((module) => module.selected || module.required)
+            .map((module) => module.code));
+    });
+  }
+}
+
+class _ModuleGroupTitle extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  const _ModuleGroupTitle({required this.title, required this.icon});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Icon(icon, size: 17, color: OySynAuthTokens.textMuted),
+          const SizedBox(width: 7),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF5C677B),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      );
 }
 
 class _ModeSelector extends StatelessWidget {
@@ -772,4 +1090,9 @@ String _fileSize(File file) {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} МБ';
   }
   return '${(bytes / 1024).toStringAsFixed(0)} КБ';
+}
+
+int _asInt(dynamic value) {
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
 }
