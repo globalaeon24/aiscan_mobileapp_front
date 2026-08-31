@@ -27,6 +27,13 @@ class ProfileService {
     }
   }
 
+  static Future<Map<String, dynamic>> updateProfile(
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send('PATCH', '/me', payload);
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
   static Future<Map<String, dynamic>> getOrganization(
       int organizationId) async {
     final token = await TokenStorage.getToken();
@@ -117,6 +124,12 @@ class ProfileService {
     final data = await _get('/organizations/$organizationId/billing-journal');
     if (data is! List) return const [];
     return data.whereType<Map<String, dynamic>>().toList();
+  }
+
+  static Future<Map<String, dynamic>> getOrganizationReports(
+      int organizationId) async {
+    final data = await _get('/organizations/$organizationId/reports');
+    return data is Map<String, dynamic> ? data : const {};
   }
 
   static Future<dynamic> _get(String path) async {

@@ -280,14 +280,23 @@ class _BillingCard extends StatelessWidget {
                           fontWeight: FontWeight.w900)))),
           const SizedBox(width: 10),
           _StepButton(icon: Icons.add_rounded, onTap: onPlus),
-          const SizedBox(width: 10),
-          SizedBox(
-              width: 126,
-              height: 48,
-              child: FilledButton(
-                  onPressed: saving || !changed ? null : onApply,
-                  child: Text(saving ? '...' : 'Применить'))),
         ]),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: FilledButton.icon(
+            onPressed: saving || !changed ? null : onApply,
+            icon: saving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check_rounded, size: 19),
+            label: Text(saving ? 'Сохранение...' : 'Применить'),
+          ),
+        ),
         const SizedBox(height: 9),
         Align(
             alignment: Alignment.centerLeft,

@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../services/profile_service.dart';
 import '../../../theme/app_theme.dart';
 import 'organization_billing_page.dart';
+import 'organization_billing_journal_page.dart';
+import 'organization_reports_page.dart';
+import '../../../widgets/oysyn_controls.dart';
 import 'organization_users_page.dart';
 
 class OrganizationPage extends StatefulWidget {
@@ -111,27 +114,25 @@ class _OrganizationDetails extends StatelessWidget {
               child: Text('Организация', style: _Styles.pageTitle),
             ),
             if (organizations.length > 1)
-              PopupMenuButton<int>(
+              IconButton(
                 tooltip: 'Выбрать организацию',
                 icon: const Icon(Icons.swap_horiz_rounded),
-                onSelected: onSelected,
-                itemBuilder: (context) => organizations
-                    .map(
-                      (item) => PopupMenuItem<int>(
-                        value: _asInt(item['id']),
-                        child: SizedBox(
-                          width: 260,
-                          child: Text(
-                            _text(item['title'], 'Организация'),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                    )
-                    .where((item) => item.value != null)
-                    .cast<PopupMenuEntry<int>>()
-                    .toList(),
+                onPressed: () async {
+                  final selected = await showOySynChoiceSheet<int>(
+                    context,
+                    title: 'Выберите организацию',
+                    selected: id ?? -1,
+                    choices: organizations
+                        .where((item) => _asInt(item['id']) != null)
+                        .map((item) => OySynChoice(
+                              _asInt(item['id'])!,
+                              _text(item['title'], 'Организация'),
+                              icon: Icons.business_outlined,
+                            ))
+                        .toList(),
+                  );
+                  if (selected != null) onSelected(selected);
+                },
               ),
           ],
         ),
@@ -154,7 +155,16 @@ class _OrganizationDetails extends StatelessWidget {
               title: 'Отчёты',
               subtitle: 'Проверки и результаты организации',
               badge: reports > 0 ? '$reports' : null,
-              onTap: () => _showUnavailable(context),
+              onTap: id == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => OrganizationReportsPage(
+                            organizationId: id,
+                            organizationName: title,
+                          ),
+                        ),
+                      ),
             ),
           ],
         ),
@@ -208,7 +218,16 @@ class _OrganizationDetails extends StatelessWidget {
               icon: Icons.history_rounded,
               title: 'Журнал биллинга',
               subtitle: 'История операций и аналитика',
-              onTap: id == null ? null : () => _showBillingJournal(context, id),
+              onTap: id == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => OrganizationBillingJournalPage(
+                            organizationId: id,
+                            organizationName: title,
+                          ),
+                        ),
+                      ),
             ),
           ],
         ),
@@ -249,43 +268,6 @@ class _OrganizationDetails extends StatelessWidget {
                 token['is_active'] == true ? 'Активен' : 'Отключен',
               ))
           .toList(),
-    );
-  }
-
-  Future<void> _showBillingJournal(BuildContext context, int id) async {
-    try {
-      final rows = await ProfileService.getOrganizationBillingJournal(id);
-      if (!context.mounted) return;
-      _showDataSheet(
-        context,
-        'Журнал биллинга',
-        rows
-            .map((row) => (
-                  _text(
-                    row['check_type_display'] ?? row['description'],
-                    'Операция',
-                  ),
-                  _journalValue(row),
-                ))
-            .toList(),
-      );
-    } catch (error) {
-      if (!context.mounted) return;
-      _showLoadError(context, error);
-    }
-  }
-
-  void _showUnavailable(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content:
-              Text('Этот раздел будет подключён после расширения API Core.')),
-    );
-  }
-
-  void _showLoadError(BuildContext context, Object error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Не удалось загрузить данные: $error')),
     );
   }
 }
@@ -642,12 +624,4 @@ String _date(dynamic value) {
   final date = DateTime.tryParse(value?.toString() ?? '');
   if (date == null) return '';
   return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
-}
-
-String _journalValue(Map<String, dynamic> row) {
-  final delta = _asInt(row['org_delta_checks']) ?? 0;
-  final date = _date(row['time']);
-  final type = row['transaction_type']?.toString();
-  final sign = type == 'OUTCOME' ? '-' : '+';
-  return ['$sign$delta', if (date.isNotEmpty) date].join(' · ');
 }

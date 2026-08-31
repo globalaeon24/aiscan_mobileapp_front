@@ -76,7 +76,7 @@ class _LinkedDevicesPageState extends State<LinkedDevicesPage> {
                 icon: Icons.devices_other_rounded,
                 title: 'Нет связанных устройств',
                 message:
-                    'Активные веб-сессии появятся здесь после входа через QR.',
+                    'Активные мобильные и веб-сессии появятся здесь после входа.',
               );
             }
 
@@ -204,8 +204,8 @@ class _LinkedDeviceDetailsPageState extends State<LinkedDeviceDetailsPage> {
                     color: Color(0xFFEAF0FF),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.laptop_mac_rounded,
+                  child: Icon(
+                    _deviceIcon(session),
                     color: OySynAuthTokens.primaryBlue,
                     size: 38,
                   ),
@@ -374,8 +374,8 @@ class _LinkedDeviceTile extends StatelessWidget {
           color: const Color(0xFFEAF0FF),
           borderRadius: BorderRadius.circular(22),
         ),
-        child: const Icon(
-          Icons.laptop_mac_rounded,
+        child: Icon(
+          _deviceIcon(session),
           color: OySynAuthTokens.primaryBlue,
           size: 24,
         ),
@@ -555,6 +555,14 @@ String _activityText(LinkedDeviceSession session) {
   final date = session.lastActiveAt;
   if (date == null) return 'Активно сейчас';
   return 'Активно: ${_friendlyDate(date)}';
+}
+
+IconData _deviceIcon(LinkedDeviceSession session) {
+  return switch (session.deviceType?.toLowerCase()) {
+    'mobile' => Icons.smartphone_rounded,
+    'tablet' => Icons.tablet_mac_rounded,
+    _ => Icons.laptop_mac_rounded,
+  };
 }
 
 String _fallback(String value, String fallback) {

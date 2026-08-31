@@ -182,6 +182,7 @@ class ScanService {
     int page = 1,
     int pageSize = 20,
     String? status,
+    int? folderId,
   }) async {
     final token = await TokenStorage.getToken();
     if (token == null) {
@@ -192,6 +193,7 @@ class ScanService {
       "page": "$page",
       "page_size": "$pageSize",
       if (status != null && status.isNotEmpty) "status": status,
+      if (folderId != null) "folder_id": "$folderId",
     };
     final uri = Uri.parse("$baseUrl/checks").replace(queryParameters: query);
     final res =
@@ -238,6 +240,21 @@ class ScanService {
         .map((item) => CheckModule.fromJson(item as Map<String, dynamic>))
         .where((item) => item.code.isNotEmpty)
         .toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> getFolders() async {
+    final token = await TokenStorage.getToken();
+    if (token == null) throw Exception('Нет токена авторизации.');
+    final response = await http.get(
+      Uri.parse('$baseUrl/folders'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Не удалось загрузить папки: ${response.statusCode}');
+    }
+    final data = jsonDecode(response.body);
+    if (data is! List) return const [];
+    return data.whereType<Map<String, dynamic>>().toList();
   }
 
   /// ================================================================

@@ -17,7 +17,7 @@ class LinkedDevicesService {
     return items
         .whereType<Map<String, dynamic>>()
         .map(LinkedDeviceSession.fromJson)
-        .where((session) => session.id > 0)
+        .where((session) => session.id != 0)
         .toList();
   }
 

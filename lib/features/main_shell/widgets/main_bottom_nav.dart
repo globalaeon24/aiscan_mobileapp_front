@@ -16,6 +16,7 @@ class MainBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
+      minimum: const EdgeInsets.only(bottom: 4),
       child: Container(
         height: 76,
         decoration: BoxDecoration(

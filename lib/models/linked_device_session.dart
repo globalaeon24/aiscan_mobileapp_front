@@ -37,7 +37,9 @@ class LinkedDeviceSession {
     final value = deviceName.trim();
     if (value.isNotEmpty) return value;
     if (browser != null && browser!.trim().isNotEmpty) return browser!.trim();
-    return 'Веб-браузер';
+    return deviceType == 'mobile' || deviceType == 'tablet'
+        ? 'Мобильное устройство'
+        : 'Веб-браузер';
   }
 
   String get subtitle {
@@ -47,7 +49,7 @@ class LinkedDeviceSession {
     ];
     final visible = parts.where((part) => part.trim().isNotEmpty).toList();
     if (visible.isNotEmpty) return visible.join(' • ');
-    return isActive ? 'Активная веб-сессия' : 'Сессия отключена';
+    return isActive ? 'Активная сессия' : 'Сессия отключена';
   }
 
   String get softwareLabel {
@@ -81,7 +83,7 @@ class LinkedDeviceSession {
 
     return LinkedDeviceSession(
       id: rawId is int ? rawId : int.tryParse(rawId.toString()) ?? 0,
-      deviceName: _text(json['device_name'] ?? json['device']) ?? 'Веб-браузер',
+      deviceName: _text(json['device_name'] ?? json['device']) ?? '',
       browser: _text(json['browser']),
       browserVersion: _text(json['browser_version']),
       platform: _text(json['platform']),

@@ -7,6 +7,7 @@ import '../models/scan_result.dart';
 import '../services/profile_service.dart';
 import '../services/scan_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/oysyn_controls.dart';
 import 'scan_details_screen.dart';
 
 class ScanScreen extends StatefulWidget {
@@ -275,6 +276,7 @@ class _ScanScreenState extends State<ScanScreen> {
       ),
       bottomNavigationBar: SafeArea(
         top: false,
+        minimum: const EdgeInsets.only(bottom: 4),
         child: Container(
           padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
           decoration: const BoxDecoration(
@@ -863,15 +865,32 @@ class _DocumentTypeField extends StatelessWidget {
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          initialValue: value,
-          isExpanded: true,
-          items: items.entries
-              .map((item) => DropdownMenuItem(
-                  value: item.key,
-                  child: Text(item.value, overflow: TextOverflow.ellipsis)))
-              .toList(),
-          onChanged: onChanged,
+        InkWell(
+          onTap: () async {
+            final selected = await showOySynChoiceSheet<String>(
+              context,
+              title: 'Тип документа',
+              selected: value,
+              choices: items.entries
+                  .map((item) => OySynChoice(item.key, item.value))
+                  .toList(),
+            );
+            if (selected != null) onChanged(selected);
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: InputDecorator(
+            decoration: const InputDecoration(),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(items[value] ?? value,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+                const Icon(Icons.keyboard_arrow_down_rounded,
+                    color: OySynAuthTokens.textMuted),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -1012,7 +1031,7 @@ class _SettingRow extends StatelessWidget {
               ],
             ),
           ),
-          Switch(value: value, onChanged: onChanged),
+          OySynSwitch(value: value, onChanged: onChanged),
         ],
       ),
     );

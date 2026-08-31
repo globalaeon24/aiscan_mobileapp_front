@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
 import '../storage/token_storage.dart';
+import 'device_identity_service.dart';
 
 class AuthService {
   static const baseUrl = ApiConfig.baseUrl;
@@ -32,6 +33,7 @@ class AuthService {
 
     late final http.Response res;
     try {
+      final deviceMetadata = await DeviceIdentityService.loginMetadata();
       res = await http
           .post(
             Uri.parse("$baseUrl/auth/login"),
@@ -39,6 +41,7 @@ class AuthService {
             body: jsonEncode({
               "email": trimmedEmail,
               "password": trimmedPassword,
+              ...deviceMetadata,
             }),
           )
           .timeout(const Duration(seconds: 20));

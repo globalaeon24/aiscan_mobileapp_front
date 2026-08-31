@@ -42,6 +42,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
+  Future<void> _editProfile(Map<String, dynamic> user) async {
+    final updated = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ProfileEditor(user: user),
+    );
+    if (updated == null || !mounted) return;
+    await TokenStorage.saveUser(updated);
+    setState(() => _profile = Future.value(updated));
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>?>(
@@ -66,7 +79,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
             switch (_tab) {
               0 => Column(
                   children: [
-                    _AccountCard(user: user),
+                    _AccountCard(
+                      user: user,
+                      onEdit: () => _editProfile(user),
+                    ),
                     const SizedBox(height: 14),
                     _NavigationCard(
                       icon: Icons.business_outlined,
@@ -297,22 +313,26 @@ class _Tabs extends StatelessWidget {
 
 class _AccountCard extends StatelessWidget {
   final Map<String, dynamic> user;
-  const _AccountCard({required this.user});
+  final VoidCallback onEdit;
+  const _AccountCard({required this.user, required this.onEdit});
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
         decoration: _card(),
         child: Column(children: [
-          const Row(children: [
-            Expanded(child: Text('Учётные данные', style: _sectionTitle)),
-            Icon(Icons.edit_outlined,
-                color: OySynAuthTokens.primaryBlue, size: 19),
-            SizedBox(width: 5),
-            Text('Изменить',
-                style: TextStyle(
-                    color: OySynAuthTokens.primaryBlue,
-                    fontWeight: FontWeight.w800)),
+          Row(children: [
+            const Expanded(child: Text('Учётные данные', style: _sectionTitle)),
+            TextButton.icon(
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Изменить'),
+              style: TextButton.styleFrom(
+                foregroundColor: OySynAuthTokens.primaryBlue,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                textStyle: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
           ]),
           const Divider(height: 22, color: OySynAuthTokens.divider),
           _DataRow(
@@ -330,6 +350,154 @@ class _AccountCard extends StatelessWidget {
               value: _text(user['email'], 'Не указано'),
               last: true),
         ]),
+      );
+}
+
+class _ProfileEditor extends StatefulWidget {
+  final Map<String, dynamic> user;
+
+  const _ProfileEditor({required this.user});
+
+  @override
+  State<_ProfileEditor> createState() => _ProfileEditorState();
+}
+
+class _ProfileEditorState extends State<_ProfileEditor> {
+  late final TextEditingController _firstName;
+  late final TextEditingController _lastName;
+  late final TextEditingController _middleName;
+  late final TextEditingController _phone;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _firstName =
+        TextEditingController(text: widget.user['first_name']?.toString());
+    _lastName =
+        TextEditingController(text: widget.user['last_name']?.toString());
+    _middleName =
+        TextEditingController(text: widget.user['middle_name']?.toString());
+    _phone =
+        TextEditingController(text: widget.user['phone_number']?.toString());
+  }
+
+  @override
+  void dispose() {
+    _firstName.dispose();
+    _lastName.dispose();
+    _middleName.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final updated = await ProfileService.updateProfile({
+        'first_name': _firstName.text.trim(),
+        'last_name': _lastName.text.trim(),
+        'middle_name': _middleName.text.trim(),
+        'phone_number': _phone.text.trim(),
+      });
+      if (mounted) Navigator.of(context).pop(updated);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось сохранить данные: $error')),
+        );
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: OySynAuthTokens.appBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC9D1E2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text('Учётные данные', style: _pageTitle),
+            const SizedBox(height: 16),
+            _EditField(label: 'Фамилия', controller: _lastName),
+            _EditField(label: 'Имя', controller: _firstName),
+            _EditField(label: 'Отчество', controller: _middleName),
+            _EditField(
+              label: 'Телефон',
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_rounded),
+                label: Text(_saving ? 'Сохранение...' : 'Сохранить'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final TextInputType? keyboardType;
+
+  const _EditField({
+    required this.label,
+    required this.controller,
+    this.keyboardType,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: const TextStyle(
+                    color: OySynAuthTokens.textMuted,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            TextField(controller: controller, keyboardType: keyboardType),
+          ],
+        ),
       );
 }
 

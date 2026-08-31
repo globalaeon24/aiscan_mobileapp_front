@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../services/profile_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/oysyn_controls.dart';
 
 class OrganizationUsersPage extends StatefulWidget {
   final int organizationId;
@@ -140,7 +141,12 @@ class _OrganizationUsersPageState extends State<OrganizationUsersPage> {
               ),
             ),
             Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                12,
+                20,
+                14 + MediaQuery.viewPaddingOf(context).bottom,
+              ),
               color: Colors.white,
               child: Column(
                 children: [
@@ -298,13 +304,21 @@ class _FilterMenu<T> extends StatelessWidget {
       required this.onChanged});
 
   @override
-  Widget build(BuildContext context) => PopupMenuButton<T>(
-        initialValue: value,
-        onSelected: onChanged,
-        itemBuilder: (_) => items
-            .map((item) =>
-                PopupMenuItem<T>(value: item, child: Text(itemLabel(item))))
-            .toList(),
+  Widget build(BuildContext context) => InkWell(
+        onTap: () async {
+          final selected = await showOySynChoiceSheet<T>(
+            context,
+            title: label,
+            selected: value,
+            choices: items
+                .map((item) => OySynChoice(item, itemLabel(item)))
+                .toList(),
+          );
+          if (selected != null || items.contains(null)) {
+            onChanged(selected as T);
+          }
+        },
+        borderRadius: BorderRadius.circular(13),
         child: Container(
           height: 50,
           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -634,17 +648,39 @@ class _UserEditorSheetState extends State<_UserEditorSheet> {
                       ),
                       const SizedBox(height: 14),
                       _EditorLabel('Роль в организации'),
-                      DropdownButtonFormField<String>(
-                        initialValue: _role,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.badge_outlined),
+                      InkWell(
+                        onTap: () async {
+                          final role = await showOySynChoiceSheet<String>(
+                            context,
+                            title: 'Роль в организации',
+                            selected: _role,
+                            choices: const [
+                              'MOD',
+                              'SUP',
+                              'EXP',
+                              'ADM',
+                              'AUT',
+                              'DEC'
+                            ]
+                                .map((value) =>
+                                    OySynChoice(value, _roleLabel(value)))
+                                .toList(),
+                          );
+                          if (role != null) setState(() => _role = role);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.badge_outlined),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(child: Text(_roleLabel(_role))),
+                              const Icon(Icons.keyboard_arrow_down_rounded,
+                                  color: OySynAuthTokens.textMuted),
+                            ],
+                          ),
                         ),
-                        items: const ['MOD', 'SUP', 'EXP', 'ADM', 'AUT', 'DEC']
-                            .map((role) => DropdownMenuItem(
-                                value: role, child: Text(_roleLabel(role))))
-                            .toList(),
-                        onChanged: (value) =>
-                            setState(() => _role = value ?? _role),
                       ),
                       const SizedBox(height: 14),
                       _EditorLabel(

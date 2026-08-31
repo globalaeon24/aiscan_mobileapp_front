@@ -34,7 +34,12 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
 
     if (ok) {
       Navigator.of(context).pushReplacementNamed('/home');
+      return;
     }
+
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _pinKey.currentState?.requestKeyboard(),
+    );
   }
 
   Future<void> _onPinCompleted(String pin) async {

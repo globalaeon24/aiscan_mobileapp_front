@@ -4,6 +4,7 @@ import '../../../models/scan_result.dart';
 import '../../../screens/scan_details_screen.dart';
 import '../../../services/scan_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/oysyn_controls.dart';
 import '../../dashboard/models/dashboard_document.dart';
 import '../../dashboard/widgets/document_card.dart';
 
@@ -36,6 +37,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
   bool _newestFirst = true;
   int _page = 1;
   String _query = '';
+  int _documentTab = 0;
+  int? _folderId;
 
   @override
   void initState() {
@@ -53,7 +56,11 @@ class _DocumentsPageState extends State<DocumentsPage> {
   }
 
   Future<CheckHistoryPage> _load() {
-    return ScanService.getHistoryPage(page: _page, pageSize: _pageSize);
+    return ScanService.getHistoryPage(
+      page: _page,
+      pageSize: _pageSize,
+      folderId: _folderId,
+    );
   }
 
   Future<void> _refresh() async {
@@ -78,6 +85,24 @@ class _DocumentsPageState extends State<DocumentsPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _showFolders() async {
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _FoldersSheet(
+        future: ScanService.getFolders(),
+        selectedId: _folderId,
+      ),
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _folderId = selected < 0 ? null : selected;
+      _page = 1;
+      _future = _load();
+    });
   }
 
   List<ScanResult> _filteredItems(List<ScanResult> items) {
@@ -133,9 +158,16 @@ class _DocumentsPageState extends State<DocumentsPage> {
                     ),
                   const SizedBox(width: 10),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: _showFolders,
                     tooltip: 'Папки',
-                    icon: const Icon(Icons.folder_outlined),
+                    icon: Icon(
+                      _folderId == null
+                          ? Icons.folder_outlined
+                          : Icons.folder_rounded,
+                      color: _folderId == null
+                          ? null
+                          : OySynAuthTokens.primaryBlue,
+                    ),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.white,
                       side: const BorderSide(color: OySynAuthTokens.divider),
@@ -146,7 +178,10 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              const _DocumentTabs(),
+              _DocumentTabs(
+                selected: _documentTab,
+                onChanged: (value) => setState(() => _documentTab = value),
+              ),
               const SizedBox(height: 12),
               _DocumentFilters(
                 controller: _searchController,
@@ -160,7 +195,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
                     setState(() => _newestFirst = !_newestFirst),
               ),
               const SizedBox(height: 12),
-              if (snapshot.hasError)
+              if (_documentTab == 1)
+                const _PairChecksState()
+              else if (snapshot.hasError)
                 _DocumentsMessage(
                   icon: Icons.wifi_off_rounded,
                   title: 'Не удалось загрузить документы',
@@ -240,13 +277,19 @@ class _DocumentFilters extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: PopupMenuButton<_PeriodFilter>(
-                initialValue: selectedPeriod,
-                onSelected: onPeriodChanged,
-                itemBuilder: (_) => _PeriodFilter.values
-                    .map((period) =>
-                        PopupMenuItem(value: period, child: Text(period.label)))
-                    .toList(),
+              child: InkWell(
+                onTap: () async {
+                  final value = await showOySynChoiceSheet<_PeriodFilter>(
+                    context,
+                    title: 'Период',
+                    selected: selectedPeriod,
+                    choices: _PeriodFilter.values
+                        .map((item) => OySynChoice(item, item.label))
+                        .toList(),
+                  );
+                  if (value != null) onPeriodChanged(value);
+                },
+                borderRadius: BorderRadius.circular(10),
                 child: _FilterButton(
                     icon: Icons.calendar_today_outlined,
                     label: selectedPeriod == _PeriodFilter.all
@@ -256,14 +299,22 @@ class _DocumentFilters extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: PopupMenuButton<String?>(
-                onSelected: onStatusChanged,
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: null, child: Text('Все статусы')),
-                  PopupMenuItem(value: 'CH', child: Text('Проверено')),
-                  PopupMenuItem(value: 'PR', child: Text('Проверяется')),
-                  PopupMenuItem(value: 'FA', child: Text('Ошибка')),
-                ],
+              child: InkWell(
+                onTap: () async {
+                  final value = await showOySynChoiceSheet<String?>(
+                    context,
+                    title: 'Статус',
+                    selected: statusFilter,
+                    choices: const [
+                      OySynChoice(null, 'Все статусы'),
+                      OySynChoice('CH', 'Проверено'),
+                      OySynChoice('PR', 'Проверяется'),
+                      OySynChoice('FA', 'Ошибка'),
+                    ],
+                  );
+                  onStatusChanged(value);
+                },
+                borderRadius: BorderRadius.circular(10),
                 child: _FilterButton(
                     icon: Icons.filter_list_rounded,
                     label: statusFilter == null
@@ -332,35 +383,176 @@ class _FilterButton extends StatelessWidget {
 }
 
 class _DocumentTabs extends StatelessWidget {
-  const _DocumentTabs();
+  final int selected;
+  final ValueChanged<int> onChanged;
+
+  const _DocumentTabs({required this.selected, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: _tab('Мои документы', true)),
+        Expanded(child: _tab('Мои документы', 0)),
         const SizedBox(width: 8),
-        Expanded(child: _tab('Парные проверки', false)),
+        Expanded(child: _tab('Парные проверки', 1)),
       ],
     );
   }
 
-  Widget _tab(String label, bool selected) => Container(
-        height: 42,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? OySynAuthTokens.primaryBlue : Colors.white,
-          border: Border.all(
-              color: selected
-                  ? OySynAuthTokens.primaryBlue
-                  : OySynAuthTokens.divider),
-          borderRadius: BorderRadius.circular(11),
+  Widget _tab(String label, int value) => InkWell(
+        onTap: () => onChanged(value),
+        borderRadius: BorderRadius.circular(11),
+        child: Container(
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color:
+                selected == value ? OySynAuthTokens.primaryBlue : Colors.white,
+            border: Border.all(
+                color: selected == value
+                    ? OySynAuthTokens.primaryBlue
+                    : OySynAuthTokens.divider),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Text(label,
+              style: TextStyle(
+                  color: selected == value
+                      ? Colors.white
+                      : const Color(0xFF5A6577),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700)),
         ),
-        child: Text(label,
-            style: TextStyle(
-                color: selected ? Colors.white : const Color(0xFF5A6577),
-                fontSize: 13,
-                fontWeight: FontWeight.w700)),
+      );
+}
+
+class _PairChecksState extends StatelessWidget {
+  const _PairChecksState();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: OySynAuthTokens.divider),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.compare_arrows_rounded,
+                size: 36, color: OySynAuthTokens.primaryBlue),
+            SizedBox(height: 12),
+            Text('Парные проверки',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            SizedBox(height: 6),
+            Text(
+              'Core пока не предоставляет список парных проверок через мобильный API.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: OySynAuthTokens.textMuted, height: 1.4),
+            ),
+          ],
+        ),
+      );
+}
+
+class _FoldersSheet extends StatelessWidget {
+  final Future<List<Map<String, dynamic>>> future;
+  final int? selectedId;
+
+  const _FoldersSheet({required this.future, required this.selectedId});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .7),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: const BoxDecoration(
+          color: OySynAuthTokens.appBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Center(
+                child: SizedBox(width: 42, child: Divider(thickness: 4))),
+            const SizedBox(height: 10),
+            const Text('Папки', style: OySynTextStyles.sectionTitle),
+            const SizedBox(height: 12),
+            Flexible(
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text('Не удалось загрузить папки',
+                          style: TextStyle(color: OySynAuthTokens.textMuted)),
+                    );
+                  }
+                  final folders = snapshot.data ?? const [];
+                  if (folders.isEmpty) {
+                    return const Center(
+                      child: Text('Папок пока нет',
+                          style: TextStyle(color: OySynAuthTokens.textMuted)),
+                    );
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: folders.length + 1,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (_, index) {
+                      if (index == 0) {
+                        return ListTile(
+                          onTap: () => Navigator.of(context).pop(-1),
+                          tileColor: selectedId == null
+                              ? const Color(0xFFEAF0FF)
+                              : Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(13),
+                              side: const BorderSide(
+                                  color: OySynAuthTokens.divider)),
+                          leading: const Icon(Icons.folder_open_rounded,
+                              color: OySynAuthTokens.primaryBlue),
+                          title: const Text('Все документы'),
+                          trailing: selectedId == null
+                              ? const Icon(Icons.check_circle_rounded,
+                                  color: OySynAuthTokens.primaryBlue)
+                              : null,
+                        );
+                      }
+                      final folder = folders[index - 1];
+                      final id = folder['id'] is num
+                          ? (folder['id'] as num).toInt()
+                          : int.tryParse('${folder['id']}');
+                      final active = id != null && id == selectedId;
+                      return ListTile(
+                        onTap: id == null
+                            ? null
+                            : () => Navigator.of(context).pop(id),
+                        tileColor:
+                            active ? const Color(0xFFEAF0FF) : Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(13),
+                            side: const BorderSide(
+                                color: OySynAuthTokens.divider)),
+                        leading: const Icon(Icons.folder_rounded,
+                            color: OySynAuthTokens.primaryBlue),
+                        title: Text(folder['name']?.toString() ?? 'Папка'),
+                        trailing: active
+                            ? const Icon(Icons.check_circle_rounded,
+                                color: OySynAuthTokens.primaryBlue)
+                            : Text('${folder['documents_count'] ?? 0}'),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       );
 }
 

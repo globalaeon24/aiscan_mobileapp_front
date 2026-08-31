@@ -11,6 +11,8 @@ class CheckReport {
   final int uniqueness;
   final List<ReportSource> sources;
   final List<ReportFraud> fraud;
+  final String documentText;
+  final List<String> aiDetectedTexts;
 
   const CheckReport({
     required this.id,
@@ -25,6 +27,8 @@ class CheckReport {
     required this.uniqueness,
     this.sources = const [],
     this.fraud = const [],
+    this.documentText = '',
+    this.aiDetectedTexts = const [],
   });
 
   factory CheckReport.fromJson(Map<String, dynamic> json) {
@@ -44,6 +48,16 @@ class CheckReport {
           .toList(),
       fraud: (json['fraud'] as List<dynamic>? ?? const [])
           .map((item) => ReportFraud.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      documentText: json['document_text']?.toString() ?? '',
+      aiDetectedTexts: (json['ai_detected_texts'] as List<dynamic>? ?? const [])
+          .map((item) {
+            if (item is Map<String, dynamic>) {
+              return item['text']?.toString() ?? '';
+            }
+            return item?.toString() ?? '';
+          })
+          .where((item) => item.trim().isNotEmpty)
           .toList(),
     );
   }
