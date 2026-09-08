@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
@@ -61,20 +61,10 @@ class ScanService {
   static const String baseUrl = ApiConfig.baseUrl;
 
   /// ================================================================
-  /// 1) OCR — отправка изображения на backend
-  /// ================================================================
-  static Future<String> uploadImageForOCR(File file) async {
-    throw UnsupportedError(
-      "OCR изображения через mobile backend больше не поддерживается. "
-      "Загрузите документ через проверку /api/v1/checks.",
-    );
-  }
-
-  /// ================================================================
-  /// 2) Загрузка документа и проверка
+  /// Загрузка документа и проверка
   /// ================================================================
   static Future<ScanResult> uploadDocumentForScan(
-    File file, {
+    PlatformFile file, {
     String? title,
     String? author,
     String? department,
@@ -92,8 +82,9 @@ class ScanService {
     final uri = Uri.parse("$baseUrl/checks");
     final request = http.MultipartRequest("POST", uri);
     request.headers["Authorization"] = "Bearer $token";
-    request.fields["title"] =
-        title == null || title.trim().isEmpty ? _fileTitle(file) : title.trim();
+    request.fields["title"] = title == null || title.trim().isEmpty
+        ? _fileTitle(file.name)
+        : title.trim();
     request.fields["include_ocr"] = includeOcr.toString();
     request.fields["ocr_languages"] = "rus+kaz+eng";
     request.fields["ai_check"] = aiCheck.toString();
@@ -110,7 +101,7 @@ class ScanService {
     }
 
     var mediaType = MediaType('application', 'octet-stream');
-    final name = file.path.toLowerCase();
+    final name = file.name.toLowerCase();
 
     if (name.endsWith('.pdf')) {
       mediaType = MediaType('application', 'pdf');
@@ -128,13 +119,29 @@ class ScanService {
       mediaType = MediaType('text', 'plain');
     }
 
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        "document",
-        file.path,
-        contentType: mediaType,
-      ),
-    );
+    final bytes = file.bytes;
+    final path = file.path;
+    if (bytes != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          "document",
+          bytes,
+          filename: file.name,
+          contentType: mediaType,
+        ),
+      );
+    } else if (path != null && path.isNotEmpty) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          "document",
+          path,
+          filename: file.name,
+          contentType: mediaType,
+        ),
+      );
+    } else {
+      throw Exception('Не удалось прочитать выбранный файл.');
+    }
 
     final response = await request.send();
     final body = await response.stream.bytesToString();
@@ -209,18 +216,59 @@ class ScanService {
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+      final responsePage = _asInt(json is Map ? json["page"] : null) ?? page;
+      final total = _asInt(json is Map
+          ? (json["count"] ?? json["total"] ?? json["total_count"])
+          : null);
+      final pages = _asInt(json is Map ? json["pages"] : null) ??
+          (total == null || total <= 0 ? null : (total / pageSize).ceil());
+
       return CheckHistoryPage(
         items: items,
-        page: _asInt(json is Map ? json["page"] : null) ?? page,
+        page: responsePage,
         pageSize: pageSize,
-        total: _asInt(json is Map
-            ? (json["count"] ?? json["total"] ?? json["total_count"])
-            : null),
-        hasNext: json is Map ? json["next"] != null : items.length == pageSize,
-        hasPrevious: json is Map ? json["previous"] != null : page > 1,
+        total: total,
+        hasNext: json is Map
+            ? (json["next"] != null || (pages != null && responsePage < pages))
+            : items.length == pageSize,
+        hasPrevious: json is Map
+            ? (json["previous"] != null || responsePage > 1)
+            : page > 1,
       );
     } else {
       throw Exception("Ошибка истории: ${res.statusCode} ${res.body}");
+    }
+  }
+
+  static Future<List<ScanResult>> getAllHistory({int? folderId}) async {
+    const pageSize = 100;
+    const maxPages = 50;
+    final items = <ScanResult>[];
+    for (var page = 1; page <= maxPages; page++) {
+      final result = await getHistoryPage(
+        page: page,
+        pageSize: pageSize,
+        folderId: folderId,
+      );
+      items.addAll(result.items);
+      if (!result.hasNext) break;
+    }
+    items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return items;
+  }
+
+  static Future<void> deleteCheck(int id) async {
+    final token = await TokenStorage.getToken();
+    if (token == null) throw Exception('Нет токена авторизации.');
+    final response = await http.delete(
+      Uri.parse('$baseUrl/checks/$id'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode == 405 || response.statusCode == 501) {
+      throw Exception('Удаление документов пока не поддерживается Core.');
+    }
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Не удалось удалить документ (${response.statusCode}).');
     }
   }
 
@@ -313,10 +361,7 @@ class ScanService {
     return response.bodyBytes;
   }
 
-  static String _fileTitle(File file) {
-    final path = file.path;
-    final separator = Platform.pathSeparator;
-    final name = path.contains(separator) ? path.split(separator).last : path;
+  static String _fileTitle(String name) {
     final dotIndex = name.lastIndexOf('.');
     return dotIndex > 0 ? name.substring(0, dotIndex) : name;
   }

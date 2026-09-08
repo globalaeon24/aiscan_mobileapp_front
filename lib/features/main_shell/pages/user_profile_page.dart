@@ -4,7 +4,7 @@ import '../../../services/profile_service.dart';
 import '../../../services/security_service.dart';
 import '../../../storage/token_storage.dart';
 import '../../../theme/app_theme.dart';
-import 'organization_page.dart';
+import '../../../widgets/pin_code_input.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -55,6 +55,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
     setState(() => _profile = Future.value(updated));
   }
 
+  Future<void> _changePin() async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ChangePinSheet(),
+    );
+    if (changed != true || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('PIN-код успешно изменён')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>?>(
@@ -66,9 +80,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
         }
         final user = snapshot.data ?? const <String, dynamic>{};
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 96),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            18,
+            20,
+            112 + MediaQuery.paddingOf(context).bottom,
+          ),
           children: [
-            _PageHeader(balance: _int(user['checks_available'])),
+            const _PageHeader(),
             const SizedBox(height: 18),
             _IdentityCard(user: user),
             const SizedBox(height: 16),
@@ -83,42 +102,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       user: user,
                       onEdit: () => _editProfile(user),
                     ),
-                    const SizedBox(height: 14),
-                    _NavigationCard(
-                      icon: Icons.business_outlined,
-                      title: 'Организация',
-                      subtitle: _text(
-                        user['organization_name'],
-                        'Данные и управление',
-                      ),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => OrganizationPage(
-                            initialOrganizationId: _nullableInt(
-                              user['organization_id'],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
-              1 => _InfoCard(
-                  icon: Icons.bar_chart_rounded,
-                  title: 'Статистика',
-                  text:
-                      'Всего завершено проверок: ${_int(user['checks_completed'])}'),
-              2 => const _InfoCard(
+              1 => const _InfoCard(
                   icon: Icons.notifications_none_rounded,
                   title: 'Уведомления',
                   text:
-                      'Настройки уведомлений будут подключены после расширения API Core.'),
+                      'Здесь будут отображаться важные уведомления аккаунта.'),
               _ => Column(
                   children: [
-                    const _InfoCard(
+                    _NavigationCard(
                       icon: Icons.shield_outlined,
                       title: 'Защита аккаунта',
-                      text: 'PIN-код, биометрия и активные сессии.',
+                      subtitle: 'Изменить PIN-код входа',
+                      onTap: _changePin,
                     ),
                     const SizedBox(height: 14),
                     _NavigationCard(
@@ -133,19 +130,22 @@ class _UserProfilePageState extends State<UserProfilePage> {
             },
             if (_tab == 0) ...[
               const SizedBox(height: 14),
-              TextButton.icon(
-                onPressed: _logout,
-                style: TextButton.styleFrom(
-                  alignment: Alignment.centerLeft,
-                  foregroundColor: const Color(0xFFDF3E48),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: _logout,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFDF3E48),
+                    side: const BorderSide(color: Color(0xFFF1B7BC)),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text('Выйти из аккаунта'),
                 ),
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text('Выйти из аккаунта'),
               ),
             ],
           ],
@@ -156,27 +156,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
 }
 
 class _PageHeader extends StatelessWidget {
-  final int balance;
-  const _PageHeader({required this.balance});
+  const _PageHeader();
 
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          const Expanded(child: Text('Профиль', style: _pageTitle)),
-          Container(
-            height: 46,
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            decoration: _card(radius: 14),
-            child: Row(children: [
-              const Icon(Icons.wallet_outlined, size: 19),
-              const SizedBox(width: 8),
-              Text('$balance',
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w800)),
-            ]),
-          ),
-        ],
-      );
+  Widget build(BuildContext context) =>
+      const Text('Профиль', style: _pageTitle);
 }
 
 class _IdentityCard extends StatelessWidget {
@@ -210,7 +194,12 @@ class _IdentityCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: _cardTitle),
                 const SizedBox(height: 3),
-                Text(_text(user['email'], 'Email не указан'), style: _muted),
+                Text(
+                  _text(user['email'], 'Email не указан'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _muted,
+                ),
                 if (joined.isNotEmpty) Text(joined, style: _muted),
               ])),
         ]),
@@ -264,7 +253,7 @@ class _Tabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Профиль', 'Статистика', 'Уведомл.', 'Защита'];
+    const labels = ['Профиль', 'Уведомления', 'Защита'];
     return Row(
       children: List.generate(labels.length, (index) {
         final active = selected == index;
@@ -348,6 +337,7 @@ class _AccountCard extends StatelessWidget {
           _DataRow(
               label: 'Эл. почта',
               value: _text(user['email'], 'Не указано'),
+              singleLine: true,
               last: true),
         ]),
       );
@@ -473,6 +463,225 @@ class _ProfileEditorState extends State<_ProfileEditor> {
   }
 }
 
+enum _PinChangeStep { current, newPin, confirm }
+
+class _ChangePinSheet extends StatefulWidget {
+  const _ChangePinSheet();
+
+  @override
+  State<_ChangePinSheet> createState() => _ChangePinSheetState();
+}
+
+class _ChangePinSheetState extends State<_ChangePinSheet> {
+  final _pinKey = GlobalKey<PinCodeInputState>();
+  _PinChangeStep _step = _PinChangeStep.current;
+  String? _currentPin;
+  String? _newPin;
+  String? _error;
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _prepare();
+  }
+
+  Future<void> _prepare() async {
+    final configured = await SecurityService.isSecurityConfigured();
+    if (!mounted) return;
+    setState(() {
+      _step = configured ? _PinChangeStep.current : _PinChangeStep.newPin;
+      _loading = false;
+    });
+  }
+
+  Future<void> _onCompleted(String pin) async {
+    if (_saving) return;
+    setState(() => _error = null);
+
+    switch (_step) {
+      case _PinChangeStep.current:
+        setState(() => _saving = true);
+        final valid = await SecurityService.verifyPin(pin);
+        if (!mounted) return;
+        if (!valid) {
+          setState(() {
+            _saving = false;
+            _error = 'Текущий PIN-код введён неверно.';
+          });
+          _pinKey.currentState?.clear();
+          return;
+        }
+        _currentPin = pin;
+        _moveTo(_PinChangeStep.newPin);
+      case _PinChangeStep.newPin:
+        if (pin == _currentPin) {
+          setState(
+              () => _error = 'Новый PIN-код должен отличаться от текущего.');
+          _pinKey.currentState?.clear();
+          return;
+        }
+        _newPin = pin;
+        _moveTo(_PinChangeStep.confirm);
+      case _PinChangeStep.confirm:
+        if (pin != _newPin) {
+          setState(() => _error = 'PIN-коды не совпадают. Повторите ввод.');
+          _pinKey.currentState?.clear();
+          return;
+        }
+        setState(() => _saving = true);
+        await SecurityService.savePin(pin);
+        if (mounted) Navigator.of(context).pop(true);
+    }
+  }
+
+  void _moveTo(_PinChangeStep step) {
+    setState(() {
+      _step = step;
+      _saving = false;
+      _error = null;
+    });
+    _pinKey.currentState?.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = switch (_step) {
+      _PinChangeStep.current => 'Введите текущий PIN',
+      _PinChangeStep.newPin => 'Создайте новый PIN',
+      _PinChangeStep.confirm => 'Повторите новый PIN',
+    };
+    final description = switch (_step) {
+      _PinChangeStep.current => 'Подтвердите, что это действительно вы.',
+      _PinChangeStep.newPin => 'Используйте новый 4-значный код для входа.',
+      _PinChangeStep.confirm => 'Введите новый код ещё раз для подтверждения.',
+    };
+    final stepIndex = switch (_step) {
+      _PinChangeStep.current => 0,
+      _PinChangeStep.newPin => 1,
+      _PinChangeStep.confirm => 2,
+    };
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: OySynAuthTokens.appBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFC9D1E2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF0FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.lock_reset_rounded,
+                    color: OySynAuthTokens.primaryBlue,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('Смена PIN-кода', style: _sectionTitle),
+                ),
+                IconButton(
+                  onPressed: _saving ? null : Navigator.of(context).pop,
+                  tooltip: 'Закрыть',
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: List.generate(3, (index) {
+                final active = index <= stepIndex;
+                return Expanded(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 4,
+                    margin: EdgeInsets.only(right: index == 2 ? 0 : 7),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? OySynAuthTokens.primaryBlue
+                          : const Color(0xFFDCE3F1),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 24),
+            Text(title, textAlign: TextAlign.center, style: _cardTitle),
+            const SizedBox(height: 7),
+            Text(description, textAlign: TextAlign.center, style: _muted),
+            const SizedBox(height: 24),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 34),
+                child: CircularProgressIndicator(),
+              )
+            else
+              PinCodeInput(
+                key: _pinKey,
+                enabled: !_saving,
+                errorText: _error,
+                onCompleted: _onCompleted,
+              ),
+            if (_saving) ...[
+              const SizedBox(height: 8),
+              const CircularProgressIndicator(),
+            ],
+            const SizedBox(height: 10),
+            const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.phonelink_lock_rounded,
+                  size: 18,
+                  color: OySynAuthTokens.textMuted,
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'PIN-код хранится только на этом устройстве и не передаётся в Core.',
+                    style: TextStyle(
+                      color: OySynAuthTokens.textMuted,
+                      fontSize: 12.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EditField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
@@ -505,7 +714,13 @@ class _DataRow extends StatelessWidget {
   final String label;
   final String value;
   final bool last;
-  const _DataRow({required this.label, required this.value, this.last = false});
+  final bool singleLine;
+  const _DataRow({
+    required this.label,
+    required this.value,
+    this.last = false,
+    this.singleLine = false,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
@@ -518,16 +733,29 @@ class _DataRow extends StatelessWidget {
         child: Row(children: [
           Expanded(child: Text(label, style: _muted)),
           const SizedBox(width: 12),
-          Flexible(
-              child: Text(value,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                      color: OySynAuthTokens.textDark,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800))),
+          Expanded(
+            flex: 2,
+            child: singleLine
+                ? FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(value, style: _dataValueStyle),
+                  )
+                : Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: _dataValueStyle,
+                  ),
+          ),
         ]),
       );
 }
+
+const _dataValueStyle = TextStyle(
+  color: OySynAuthTokens.textDark,
+  fontSize: 15,
+  fontWeight: FontWeight.w800,
+);
 
 class _InfoCard extends StatelessWidget {
   final IconData icon;
@@ -623,7 +851,6 @@ BoxDecoration _card({double radius = 16}) => BoxDecoration(
 
 int _int(dynamic value) =>
     value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0;
-int? _nullableInt(dynamic value) => value == null ? null : _int(value);
 String _text(dynamic value, String fallback) {
   final text = value?.toString().trim();
   return text == null || text.isEmpty ? fallback : text;

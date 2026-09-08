@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -28,7 +29,7 @@ class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
   bool _loading = true;
   bool _sharing = false;
   String? _reportMessage;
-  int _reportTab = 0;
+  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -36,8 +37,14 @@ class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool showLoader = true}) async {
+    if (showLoader) setState(() => _loading = true);
     ScanResult detail = widget.result;
     CheckReport? report;
     String? reportMessage;
@@ -50,10 +57,17 @@ class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
       reportMessage = 'Не удалось обновить данные проверки: $error';
     }
 
-    try {
-      report = await ScanService.getReport(widget.result.id);
-    } catch (_) {
-      reportMessage ??= 'Отчёт формируется. Обновите страницу немного позже.';
+    if (_isCompleted(detail.status)) {
+      try {
+        report = await ScanService.getReport(widget.result.id);
+      } catch (_) {
+        reportMessage ??= 'Отчёт формируется. Обновите страницу немного позже.';
+      }
+    } else if (_isFailed(detail.status)) {
+      reportMessage ??= 'Core не смог завершить проверку документа.';
+    } else {
+      reportMessage ??=
+          'Проверка выполняется. Результаты обновятся автоматически.';
     }
 
     if (!mounted) return;
@@ -63,6 +77,16 @@ class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
       _reportMessage = reportMessage;
       _loading = false;
     });
+    _schedulePolling(detail.status);
+  }
+
+  void _schedulePolling(String? status) {
+    _pollTimer?.cancel();
+    if (_isCompleted(status) || _isFailed(status)) return;
+    _pollTimer = Timer(
+      const Duration(seconds: 5),
+      () => _load(showLoader: false),
+    );
   }
 
   Future<void> _sharePdf(String type, String fileName) async {
@@ -88,6 +112,8 @@ class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
   Widget build(BuildContext context) {
     final detail = _detail ?? widget.result;
     final report = _report;
+    final activeSources =
+        report?.sources.where((item) => item.active).toList() ?? const [];
     final date = detail.createdAt;
     final subtitle = [
       detail.documentType,
@@ -158,32 +184,17 @@ class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
               _FraudBanner(items: report.fraud),
             ],
             const SizedBox(height: 13),
-            _ReportTabs(
-              sourceCount:
-                  report?.sources.where((item) => item.active).length ?? 0,
-              selected: _reportTab,
-              onChanged: (value) => setState(() => _reportTab = value),
+            _SourcesHeader(
+              count: activeSources.length,
             ),
             const SizedBox(height: 13),
-            if (_reportTab == 0 && report != null && report.sources.isNotEmpty)
-              for (final source
-                  in report.sources.where((item) => item.active)) ...[
+            if (activeSources.isNotEmpty)
+              for (final source in activeSources) ...[
                 _ReportSourceCard(source: source),
                 const SizedBox(height: 10),
               ]
-            else if (_reportTab == 0 && !_loading)
+            else if (!_loading)
               const _InfoBanner(message: 'Источники совпадений не обнаружены.'),
-            if (_reportTab == 1 && !_loading)
-              _ReportTextCard(
-                title: 'Текст документа',
-                text: report?.documentText ?? '',
-                emptyMessage: 'Текст документа пока не передан из Core.',
-              ),
-            if (_reportTab == 2 && !_loading)
-              _AiTextCard(
-                fragments: report?.aiDetectedTexts ?? const [],
-                percentage: report?.aiGenerated ?? 0,
-              ),
           ],
         ),
       ),
@@ -196,9 +207,12 @@ class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
             color: Colors.white,
             border: Border(top: BorderSide(color: OySynAuthTokens.divider)),
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
+              SizedBox(
+                width: double.infinity,
+                height: 48,
                 child: FilledButton.icon(
                   onPressed: _sharing
                       ? null
@@ -207,26 +221,25 @@ class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
                             'oysyn-certificate-${detail.id}.pdf',
                           ),
                   icon: const Icon(Icons.download_rounded),
-                  label: const Text('Скачать справку'),
+                  label: const Text('Скачать справку о проверке'),
                 ),
               ),
-              const SizedBox(width: 10),
-              IconButton(
-                onPressed: _sharing
-                    ? null
-                    : () => _sharePdf(
-                          'full_report',
-                          'oysyn-report-${detail.id}.pdf',
-                        ),
-                tooltip: 'Полный отчёт',
-                icon: const Icon(Icons.description_outlined),
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(52, 52),
-                  foregroundColor: OySynAuthTokens.primaryBlue,
-                  backgroundColor: Colors.white,
-                  side: const BorderSide(color: Color(0xFFCBD9FB)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: _sharing
+                      ? null
+                      : () => _sharePdf(
+                            'full_report',
+                            'oysyn-report-${detail.id}.pdf',
+                          ),
+                  icon: const Icon(Icons.description_outlined),
+                  label: const Text('Скачать полный отчёт'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: OySynAuthTokens.primaryBlue,
+                    side: const BorderSide(color: Color(0xFFCBD9FB)),
                   ),
                 ),
               ),
@@ -380,13 +393,25 @@ class _MetricsCard extends StatelessWidget {
               const SizedBox(width: 5),
               const Text('ИИ',
                   style: TextStyle(color: Color(0xFF6D4EF0), fontSize: 11.5)),
-              const Spacer(),
-              const _LegendDot(color: Color(0xFFDDE4F3)),
-              const SizedBox(width: 5),
-              Text(
-                'Текст человека ${humanWritten.toStringAsFixed(2)}%',
-                style:
-                    const TextStyle(color: Color(0xFF71809E), fontSize: 11.5),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    const _LegendDot(color: Color(0xFFDDE4F3)),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        'Текст человека ${humanWritten.toStringAsFixed(2)}%',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                            color: Color(0xFF71809E), fontSize: 11.5),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -504,196 +529,62 @@ class _InfoBanner extends StatelessWidget {
   }
 }
 
-class _ReportTabs extends StatelessWidget {
-  final int sourceCount;
-  final int selected;
-  final ValueChanged<int> onChanged;
+class _SourcesHeader extends StatelessWidget {
+  final int count;
 
-  const _ReportTabs({
-    required this.sourceCount,
-    required this.selected,
-    required this.onChanged,
-  });
+  const _SourcesHeader({required this.count});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ReportTab(
-            label: 'Источники · $sourceCount',
-            selected: selected == 0,
-            onTap: () => onChanged(0),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _ReportTab(
-            label: 'Текст',
-            selected: selected == 1,
-            onTap: () => onChanged(1),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _ReportTab(
-            label: 'ИИ-текст',
-            selected: selected == 2,
-            onTap: () => onChanged(2),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ReportTab extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ReportTab({
-    required this.label,
-    required this.onTap,
-    this.selected = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 40,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: selected ? OySynAuthTokens.primaryBlue : Colors.white,
-          border: Border.all(
-              color: selected
-                  ? OySynAuthTokens.primaryBlue
-                  : OySynAuthTokens.divider),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-              color: selected ? Colors.white : const Color(0xFF5A6577),
-              fontSize: 12,
-              fontWeight: FontWeight.w700),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReportTextCard extends StatelessWidget {
-  final String title;
-  final String text;
-  final String emptyMessage;
-
-  const _ReportTextCard({
-    required this.title,
-    required this.text,
-    required this.emptyMessage,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final value = text.trim();
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _reportCardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: OySynAuthTokens.divider),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
         children: [
-          Text(title,
-              style: const TextStyle(
-                  color: OySynAuthTokens.textDark,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          SelectableText(
-            value.isEmpty ? emptyMessage : value,
-            style: TextStyle(
-              color: value.isEmpty
-                  ? OySynAuthTokens.textMuted
-                  : OySynAuthTokens.textDark,
-              fontSize: 13.5,
-              height: 1.55,
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF0FF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.link_rounded,
+              color: OySynAuthTokens.primaryBlue,
+              size: 20,
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AiTextCard extends StatelessWidget {
-  final List<String> fragments;
-  final double percentage;
-
-  const _AiTextCard({required this.fragments, required this.percentage});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _reportCardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text('Фрагменты с признаками ИИ',
-                    style: TextStyle(
-                        color: OySynAuthTokens.textDark,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800)),
+          const SizedBox(width: 11),
+          const Expanded(
+            child: Text(
+              'Источники совпадений',
+              style: TextStyle(
+                color: OySynAuthTokens.textDark,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0E9FF),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Text(
-                  '${percentage.toStringAsFixed(1)}%',
-                  style: const TextStyle(
-                    color: Color(0xFF7148E8),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          if (fragments.isEmpty)
-            const Text(
-              'ИИ-фрагменты не обнаружены или пока не переданы из Core.',
-              style: TextStyle(color: OySynAuthTokens.textMuted, height: 1.4),
-            )
-          else
-            for (var i = 0; i < fragments.length; i++) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF7F3FF),
-                  border: Border.all(color: const Color(0xFFE1D5FF)),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: SelectableText(
-                  fragments[i],
-                  style: const TextStyle(fontSize: 13.5, height: 1.5),
-                ),
+          Container(
+            constraints: const BoxConstraints(minWidth: 34),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF0FF),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                color: OySynAuthTokens.primaryBlue,
+                fontWeight: FontWeight.w800,
               ),
-              if (i != fragments.length - 1) const SizedBox(height: 9),
-            ],
+            ),
+          ),
         ],
       ),
     );
@@ -869,3 +760,18 @@ BoxDecoration _reportCardDecoration() => BoxDecoration(
         ),
       ],
     );
+
+bool _isCompleted(String? status) => const {
+      'CH',
+      'COMPLETED',
+      'DONE',
+      'SUCCESS',
+    }.contains(status?.trim().toUpperCase());
+
+bool _isFailed(String? status) => const {
+      'FA',
+      'FAILED',
+      'ERROR',
+      'CANCELLED',
+      'CANCELED',
+    }.contains(status?.trim().toUpperCase());

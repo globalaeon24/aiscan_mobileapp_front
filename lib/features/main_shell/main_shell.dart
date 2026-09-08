@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/documents_page.dart';
 import 'pages/qr_page.dart';
+import 'pages/organization_page.dart';
 import 'pages/user_profile_page.dart';
 import 'widgets/main_bottom_nav.dart';
 import '../../services/profile_service.dart';
 import '../../screens/scan_screen.dart';
 import '../../theme/app_theme.dart';
+import '../../storage/token_storage.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -18,12 +20,30 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
+  int? _organizationId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNavigationAccess();
+  }
+
+  Future<void> _loadNavigationAccess() async {
+    var user = await TokenStorage.getUser();
+    try {
+      final fresh = await ProfileService.getProfile();
+      if (fresh.isNotEmpty) {
+        user = fresh;
+        await TokenStorage.saveUser(fresh);
+      }
+    } catch (_) {}
+    final value = user?['organization_id'] ?? user?['core_organization_id'];
+    final organizationId =
+        value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
+    if (mounted) setState(() => _organizationId = organizationId);
+  }
 
   void _selectPage(int index) {
-    if (index == 2) {
-      _openCheck();
-      return;
-    }
     setState(() => _selectedIndex = index);
   }
 
@@ -31,6 +51,7 @@ class _MainShellState extends State<MainShell> {
     try {
       final profile = await ProfileService.getProfile();
       final rawBalance = profile['checks_available'];
+      if (rawBalance == null) return _navigateToCheck();
       final balance = rawBalance is num
           ? rawBalance.toInt()
           : int.tryParse(rawBalance?.toString() ?? '') ?? 0;
@@ -48,6 +69,10 @@ class _MainShellState extends State<MainShell> {
     } catch (_) {
       // Форма и сервер выполнят повторную проверку лимита.
     }
+    _navigateToCheck();
+  }
+
+  void _navigateToCheck() {
     if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const ScanScreen()),
@@ -58,11 +83,13 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final pages = [
       DashboardPage(
-        onCheck: () => _selectPage(2),
+        onCheck: _openCheck,
         onDocuments: () => _selectPage(1),
       ),
       const DocumentsPage(),
-      const SizedBox.shrink(),
+      _organizationId == null
+          ? const SizedBox.shrink()
+          : OrganizationPage(initialOrganizationId: _organizationId),
       const QrPage(),
       const UserProfilePage(),
     ];
@@ -79,6 +106,7 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: MainBottomNav(
         currentIndex: _selectedIndex,
         onChanged: _selectPage,
+        showOrganization: _organizationId != null,
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/oysyn_logo.dart';
 
 class MobileIntroScreen extends StatefulWidget {
   const MobileIntroScreen({super.key});
@@ -81,7 +82,7 @@ class _MobileIntroScreenState extends State<MobileIntroScreen>
                         ),
                       ],
                     ),
-                    child: Image.asset(OySynAuthTokens.logoAsset),
+                    child: const OySynLogo(size: 76),
                   ),
                   const SizedBox(height: 22),
                   const Text(

@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../models/scan_result.dart';
 import '../../../screens/scan_details_screen.dart';
 import '../../../services/scan_service.dart';
+import '../../../storage/token_storage.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/oysyn_controls.dart';
 import '../../dashboard/models/dashboard_document.dart';
 import '../../dashboard/widgets/document_card.dart';
+import '../utils/document_list_filter.dart';
 
 enum _PeriodFilter {
   all('Все', null),
@@ -31,7 +33,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
   static const int _pageSize = 20;
 
   final TextEditingController _searchController = TextEditingController();
-  late Future<CheckHistoryPage> _future;
+  final ScrollController _scrollController = ScrollController();
+  late Future<List<ScanResult>> _future;
   _PeriodFilter _period = _PeriodFilter.all;
   String? _statusFilter;
   bool _newestFirst = true;
@@ -45,22 +48,32 @@ class _DocumentsPageState extends State<DocumentsPage> {
     super.initState();
     _future = _load();
     _searchController.addListener(() {
-      setState(() => _query = _searchController.text.trim().toLowerCase());
+      setState(() {
+        _query = _searchController.text.trim().toLowerCase();
+        _page = 1;
+      });
     });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<CheckHistoryPage> _load() {
-    return ScanService.getHistoryPage(
-      page: _page,
-      pageSize: _pageSize,
-      folderId: _folderId,
-    );
+  Future<List<ScanResult>> _load() async {
+    try {
+      final items = await ScanService.getAllHistory(folderId: _folderId);
+      if (_folderId == null) await TokenStorage.saveHistory(items);
+      return items;
+    } catch (_) {
+      if (_folderId == null) {
+        final cached = await TokenStorage.getHistory();
+        if (cached.isNotEmpty) return cached;
+      }
+      rethrow;
+    }
   }
 
   Future<void> _refresh() async {
@@ -68,12 +81,60 @@ class _DocumentsPageState extends State<DocumentsPage> {
     await _future;
   }
 
-  void _goToPage(int page) {
-    if (page < 1 || page == _page) return;
-    setState(() {
-      _page = page;
-      _future = _load();
+  void _goToPage(int page, int totalPages) {
+    if (page < 1 || page > totalPages || page == _page) return;
+    setState(() => _page = page);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
     });
+  }
+
+  Future<void> _deleteDocument(ScanResult result) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить документ?'),
+        content: Text(
+          '«${result.title ?? result.fileName ?? 'Документ'}» будет удалён из истории проверок.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: const Text('Удалить'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDF3E48),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ScanService.deleteCheck(result.id);
+      if (!mounted) return;
+      await _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Документ удалён')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final message = error.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
   void _openResult(ScanResult result) {
@@ -106,40 +167,35 @@ class _DocumentsPageState extends State<DocumentsPage> {
   }
 
   List<ScanResult> _filteredItems(List<ScanResult> items) {
-    final now = DateTime.now();
-    final from =
-        _period.duration == null ? null : now.subtract(_period.duration!);
-
-    return items.where((item) {
-      final matchesPeriod = from == null || !item.createdAt.isBefore(from);
-      final matchesStatus =
-          _statusFilter == null || item.status == _statusFilter;
-      final haystack = [
-        item.title,
-        item.fileName,
-        item.authorName,
-        item.documentType,
-      ].whereType<String>().join(' ').toLowerCase();
-      final matchesSearch = _query.isEmpty || haystack.contains(_query);
-      return matchesPeriod && matchesStatus && matchesSearch;
-    }).toList()
-      ..sort((a, b) => _newestFirst
-          ? b.createdAt.compareTo(a.createdAt)
-          : a.createdAt.compareTo(b.createdAt));
+    return DocumentListFilter.apply(
+      items: items,
+      query: _query,
+      status: _statusFilter,
+      period: _period.duration,
+      newestFirst: _newestFirst,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<CheckHistoryPage>(
+    return FutureBuilder<List<ScanResult>>(
       future: _future,
       builder: (context, snapshot) {
-        final pageData = snapshot.data;
-        final filtered = _filteredItems(pageData?.items ?? const []);
+        final filtered = _filteredItems(snapshot.data ?? const []);
+        final totalPages =
+            filtered.isEmpty ? 1 : (filtered.length / _pageSize).ceil();
+        final effectivePage = _page.clamp(1, totalPages);
+        final visible = DocumentListFilter.page(
+          items: filtered,
+          page: effectivePage,
+          pageSize: _pageSize,
+        );
         final isLoading = snapshot.connectionState == ConnectionState.waiting;
 
         return RefreshIndicator(
           onRefresh: _refresh,
           child: ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 24, 20, 96),
             children: [
               Row(
@@ -186,22 +242,30 @@ class _DocumentsPageState extends State<DocumentsPage> {
               _DocumentFilters(
                 controller: _searchController,
                 selectedPeriod: _period,
-                onPeriodChanged: (period) => setState(() => _period = period),
+                onPeriodChanged: (period) => setState(() {
+                  _period = period;
+                  _page = 1;
+                }),
                 statusFilter: _statusFilter,
-                onStatusChanged: (status) =>
-                    setState(() => _statusFilter = status),
+                onStatusChanged: (status) => setState(() {
+                  _statusFilter = status;
+                  _page = 1;
+                }),
                 newestFirst: _newestFirst,
-                onSortChanged: () =>
-                    setState(() => _newestFirst = !_newestFirst),
+                onSortChanged: () => setState(() {
+                  _newestFirst = !_newestFirst;
+                  _page = 1;
+                }),
               ),
               const SizedBox(height: 12),
               if (_documentTab == 1)
                 const _PairChecksState()
               else if (snapshot.hasError)
-                _DocumentsMessage(
+                const _DocumentsMessage(
                   icon: Icons.wifi_off_rounded,
                   title: 'Не удалось загрузить документы',
-                  text: snapshot.error.toString(),
+                  text:
+                      'Проверьте соединение и потяните экран вниз, чтобы повторить загрузку.',
                 )
               else if (!isLoading && filtered.isEmpty)
                 const _DocumentsMessage(
@@ -211,21 +275,35 @@ class _DocumentsPageState extends State<DocumentsPage> {
                       'Измени поиск или период, чтобы увидеть больше проверок.',
                 )
               else
-                for (final result in filtered) ...[
+                for (final result in visible) ...[
                   DocumentCard(
                     document: DashboardDocument.fromScanResult(result),
                     detailed: true,
                     onTap: () => _openResult(result),
+                    action: IconButton(
+                      onPressed: () => _deleteDocument(result),
+                      tooltip: 'Удалить документ',
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      color: const Color(0xFFDF3E48),
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
                   const SizedBox(height: 8),
                 ],
-              if (pageData != null && !snapshot.hasError) ...[
+              if (_documentTab == 0 &&
+                  snapshot.data != null &&
+                  !snapshot.hasError) ...[
                 const SizedBox(height: 10),
                 _PaginationControls(
-                  pageData: pageData,
-                  onPrevious:
-                      pageData.hasPrevious ? () => _goToPage(_page - 1) : null,
-                  onNext: pageData.hasNext ? () => _goToPage(_page + 1) : null,
+                  page: effectivePage,
+                  totalPages: totalPages,
+                  totalItems: filtered.length,
+                  onPrevious: effectivePage > 1
+                      ? () => _goToPage(effectivePage - 1, totalPages)
+                      : null,
+                  onNext: effectivePage < totalPages
+                      ? () => _goToPage(effectivePage + 1, totalPages)
+                      : null,
                 ),
               ],
             ],
@@ -442,11 +520,11 @@ class _PairChecksState extends StatelessWidget {
             Icon(Icons.compare_arrows_rounded,
                 size: 36, color: OySynAuthTokens.primaryBlue),
             SizedBox(height: 12),
-            Text('Парные проверки',
+            Text('Здесь пока нет проверок',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
             SizedBox(height: 6),
             Text(
-              'Core пока не предоставляет список парных проверок через мобильный API.',
+              'Парные проверки появятся здесь после их создания.',
               textAlign: TextAlign.center,
               style: TextStyle(color: OySynAuthTokens.textMuted, height: 1.4),
             ),
@@ -557,22 +635,23 @@ class _FoldersSheet extends StatelessWidget {
 }
 
 class _PaginationControls extends StatelessWidget {
-  final CheckHistoryPage pageData;
+  final int page;
+  final int totalPages;
+  final int totalItems;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
 
   const _PaginationControls({
-    required this.pageData,
+    required this.page,
+    required this.totalPages,
+    required this.totalItems,
     required this.onPrevious,
     required this.onNext,
   });
 
   @override
   Widget build(BuildContext context) {
-    final totalPages = pageData.totalPages;
-    final label = totalPages == null
-        ? 'Страница ${pageData.page}'
-        : 'Страница ${pageData.page} из $totalPages';
+    final label = 'Страница $page из $totalPages · $totalItems документов';
 
     return Row(
       children: [
@@ -583,14 +662,18 @@ class _PaginationControls extends StatelessWidget {
             label: const Text('Назад'),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF475569),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: const TextStyle(
+                color: Color(0xFF475569),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ),

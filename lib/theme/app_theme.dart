@@ -162,5 +162,48 @@ ThemeData buildAppTheme() {
       color: Colors.white,
       elevation: 8,
     ),
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      modalBackgroundColor: Colors.transparent,
+      modalBarrierColor: Color(0x660F172A),
+      showDragHandle: false,
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      titleTextStyle: const TextStyle(
+        color: OySynAuthTokens.textDark,
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+      ),
+      contentTextStyle: const TextStyle(
+        color: OySynAuthTokens.textMuted,
+        fontSize: 14,
+        height: 1.4,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: Colors.white,
+      surfaceTintColor: Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      textStyle: const TextStyle(
+        color: OySynAuthTokens.textDark,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: OySynAuthTokens.textDark,
+      contentTextStyle: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
   );
 }

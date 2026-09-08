@@ -7,12 +7,10 @@ import '../../../theme/app_theme.dart';
 
 class OrganizationReportsPage extends StatelessWidget {
   final int organizationId;
-  final String organizationName;
 
   const OrganizationReportsPage({
     super.key,
     required this.organizationId,
-    required this.organizationName,
   });
 
   @override
@@ -41,15 +39,13 @@ class OrganizationReportsPage extends StatelessWidget {
                 .map(ScanResult.fromJson)
                 .toList();
             return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                12,
+                20,
+                28 + MediaQuery.paddingOf(context).bottom,
+              ),
               children: [
-                Text(organizationName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: OySynAuthTokens.textMuted,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 14),
                 Row(children: [
                   _Metric(
                       'Всего', _int(data['total']), const Color(0xFF315FE8)),
@@ -106,13 +102,24 @@ class _Metric extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text('$value',
-                style: TextStyle(
-                    color: color, fontSize: 24, fontWeight: FontWeight.w900)),
-            Text(label,
-                maxLines: 1,
-                style: const TextStyle(
-                    color: OySynAuthTokens.textMuted, fontSize: 11.5)),
+            SizedBox(
+              width: double.infinity,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('$value',
+                    style: TextStyle(
+                        color: color,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900)),
+              ),
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label,
+                  maxLines: 1,
+                  style: const TextStyle(
+                      color: OySynAuthTokens.textMuted, fontSize: 11.5)),
+            ),
           ]),
         ),
       );

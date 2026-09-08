@@ -6,12 +6,14 @@ class DocumentCard extends StatelessWidget {
   final DashboardDocument document;
   final VoidCallback? onTap;
   final bool detailed;
+  final Widget? action;
 
   const DocumentCard({
     super.key,
     required this.document,
     this.onTap,
     this.detailed = false,
+    this.action,
   });
 
   @override
@@ -96,6 +98,10 @@ class DocumentCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (action != null) ...[
+                      const SizedBox(width: 6),
+                      action!,
+                    ],
                   ],
                 ),
               ],

@@ -35,8 +35,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<_DashboardData> _load() async {
-    final history = await ScanService.getHistoryPage(page: 1, pageSize: 20);
-    final results = history.items;
+    var results = await TokenStorage.getHistory();
+    int? totalDocuments;
+    try {
+      final history = await ScanService.getHistoryPage(page: 1, pageSize: 100);
+      results = history.items;
+      totalDocuments = history.total;
+      await TokenStorage.saveHistory(results);
+    } catch (_) {}
     final user = await _loadUser();
     final docs = results.map(DashboardDocument.fromScanResult).toList();
     final completed = docs
@@ -54,9 +60,9 @@ class _DashboardPageState extends State<DashboardPage> {
       user: user,
       results: results,
       documents: docs,
-      totalDocuments: history.total ?? docs.length,
+      totalDocuments: totalDocuments ?? docs.length,
       averageOriginality: avg,
-      checksAvailable: _asInt(user?['checks_available']),
+      checksAvailable: _asNullableInt(user?['checks_available']),
       monthlyDocuments: results.where(_isCurrentMonth).length,
     );
   }
@@ -96,6 +102,9 @@ class _DashboardPageState extends State<DashboardPage> {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  static int? _asNullableInt(dynamic value) =>
+      value == null ? null : _asInt(value);
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_DashboardData>(
@@ -112,7 +121,8 @@ class _DashboardPageState extends State<DashboardPage> {
             slivers: [
               SliverToBoxAdapter(
                 child: DashboardHeader(
-                  checksAvailable: data?.checksAvailable ?? 0,
+                  checksAvailable: data?.checksAvailable,
+                  recentResults: data?.results ?? const [],
                 ),
               ),
               SliverPadding(
@@ -123,25 +133,21 @@ class _DashboardPageState extends State<DashboardPage> {
                       'Привет, ${TokenStorage.displayName(data?.user)}',
                       style: OySynTextStyles.welcomeTitle,
                     ),
-                    const SizedBox(height: 3),
-                    const Text(
-                      'Проверь работу на уникальность за 30 секунд',
-                      style: TextStyle(
-                        color: Color(0xFF6A7590),
-                        fontSize: 13.5,
-                      ),
-                    ),
                     const SizedBox(height: 14),
                     _UploadAction(
                       onTap: widget.onCheck,
-                      enabled: data == null || data.checksAvailable > 0,
+                      enabled: data?.checksAvailable == null ||
+                          data!.checksAvailable! > 0,
                     ),
                     const SizedBox(height: 14),
-                    MonthSummaryCard(
-                      totalDocuments: data?.totalDocuments ?? 0,
-                      averageOriginality: data?.averageOriginality ?? 0,
-                      monthlyDocuments: data?.monthlyDocuments ?? 0,
-                    ),
+                    if (data != null && data.totalDocuments > 0)
+                      MonthSummaryCard(
+                        totalDocuments: data.totalDocuments,
+                        averageOriginality: data.averageOriginality,
+                        monthlyDocuments: data.monthlyDocuments,
+                      )
+                    else
+                      const _NewUserGuide(),
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -179,7 +185,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     else
                       for (final result
                           in (data?.results ?? const <ScanResult>[])
-                              .take(2)) ...[
+                              .take(6)) ...[
                         DocumentCard(
                           document: DashboardDocument.fromScanResult(result),
                           onTap: () => _openResult(context, result),
@@ -203,7 +209,7 @@ class _DashboardData {
   final List<DashboardDocument> documents;
   final int totalDocuments;
   final int averageOriginality;
-  final int checksAvailable;
+  final int? checksAvailable;
   final int monthlyDocuments;
 
   const _DashboardData({
@@ -215,6 +221,49 @@ class _DashboardData {
     required this.checksAvailable,
     required this.monthlyDocuments,
   });
+}
+
+class _NewUserGuide extends StatelessWidget {
+  const _NewUserGuide();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: OySynAuthTokens.divider),
+        ),
+        child: const Row(
+          children: [
+            Icon(
+              Icons.auto_awesome_outlined,
+              color: OySynAuthTokens.primaryBlue,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Начните с первой проверки',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'Выберите документ, настройте параметры и получите подробный отчёт.',
+                    style: TextStyle(
+                      color: OySynAuthTokens.textMuted,
+                      fontSize: 12.5,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 }
 
 class _UploadAction extends StatelessWidget {

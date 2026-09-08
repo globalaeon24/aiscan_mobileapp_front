@@ -105,11 +105,6 @@ class _OrganizationDetails extends StatelessWidget {
       children: [
         Row(
           children: [
-            _SquareButton(
-              icon: Icons.arrow_back_ios_new_rounded,
-              onTap: () => Navigator.of(context).pop(),
-            ),
-            const SizedBox(width: 18),
             const Expanded(
               child: Text('Организация', style: _Styles.pageTitle),
             ),
@@ -161,7 +156,6 @@ class _OrganizationDetails extends StatelessWidget {
                         MaterialPageRoute<void>(
                           builder: (_) => OrganizationReportsPage(
                             organizationId: id,
-                            organizationName: title,
                           ),
                         ),
                       ),
@@ -181,7 +175,6 @@ class _OrganizationDetails extends StatelessWidget {
                         MaterialPageRoute<void>(
                           builder: (_) => OrganizationUsersPage(
                             organizationId: id,
-                            organizationName: title,
                           ),
                         ),
                       ),
@@ -208,7 +201,6 @@ class _OrganizationDetails extends StatelessWidget {
                         MaterialPageRoute<void>(
                           builder: (_) => OrganizationBillingPage(
                             organizationId: id,
-                            organizationName: title,
                             organizationBalance: organizationBalance,
                           ),
                         ),
@@ -224,7 +216,6 @@ class _OrganizationDetails extends StatelessWidget {
                         MaterialPageRoute<void>(
                           builder: (_) => OrganizationBillingJournalPage(
                             organizationId: id,
-                            organizationName: title,
                           ),
                         ),
                       ),
@@ -255,60 +246,104 @@ class _OrganizationDetails extends StatelessWidget {
   }
 
   Future<void> _showApiSettings(BuildContext context, int id) async {
-    final data = await ProfileService.getOrganizationApiSettings(id);
-    if (!context.mounted) return;
-    final tokens = data['api_tokens'] as List<dynamic>? ?? const [];
-    _showDataSheet(
-      context,
-      'API организации',
-      tokens
+    try {
+      final data = await ProfileService.getOrganizationApiSettings(id);
+      if (!context.mounted) return;
+      final tokens = data['api_tokens'] as List<dynamic>? ?? const [];
+      final rows = tokens
           .whereType<Map<String, dynamic>>()
           .map((token) => (
                 _text(token['name'], 'API-токен'),
                 token['is_active'] == true ? 'Активен' : 'Отключен',
               ))
-          .toList(),
-    );
+          .toList();
+      _showDataSheet(
+        context,
+        'Администрирование',
+        rows,
+        emptyText:
+            'Скоро здесь появятся настройки порогов, экспертов, индексации и API-доступа.',
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      _showDataSheet(
+        context,
+        'Администрирование',
+        const [],
+        emptyText:
+            'Скоро здесь появятся настройки порогов, экспертов, индексации и API-доступа.',
+      );
+    }
   }
 }
 
 void _showDataSheet(
   BuildContext context,
   String title,
-  List<(String, String)> rows,
-) {
+  List<(String, String)> rows, {
+  String emptyText = 'Данные пока отсутствуют',
+}) {
   showModalBottomSheet<void>(
     context: context,
-    showDragHandle: true,
-    backgroundColor: Colors.white,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 4, 22, 28),
+      top: false,
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .72,
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 10, 22, 22),
+        decoration: const BoxDecoration(
+          color: OySynAuthTokens.appBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFC9D1E2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
             Text(title, style: _Styles.cardTitle),
             const SizedBox(height: 14),
-            if (rows.isEmpty)
-              const Text('Данные отсутствуют', style: _Styles.subtitle)
-            else
-              ...rows.map((row) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(row.$1, style: _Styles.body)),
-                        const SizedBox(width: 14),
-                        Flexible(
-                          child: Text(
-                            row.$2,
-                            textAlign: TextAlign.right,
-                            style: _Styles.subtitle,
-                          ),
-                        ),
-                      ],
+            Flexible(
+              child: rows.isEmpty
+                  ? Text(emptyText, style: _Styles.subtitle)
+                  : ListView(
+                      shrinkWrap: true,
+                      children: rows
+                          .map((row) => Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                        child:
+                                            Text(row.$1, style: _Styles.body)),
+                                    const SizedBox(width: 14),
+                                    Flexible(
+                                      child: Text(
+                                        row.$2,
+                                        textAlign: TextAlign.right,
+                                        style: _Styles.subtitle,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
                     ),
-                  )),
+            ),
           ],
         ),
       ),
@@ -327,42 +362,63 @@ class _OrganizationHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: _Styles.cardDecoration,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: OySynAuthTokens.primaryBlue,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child:
-                const Icon(Icons.radar_rounded, color: Colors.white, size: 32),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: OySynAuthTokens.primaryBlue,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.radar_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  title,
+                  softWrap: true,
+                  style: _Styles.cardTitle,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: _Styles.cardTitle),
-                const SizedBox(height: 3),
-                Text(subtitle, style: _Styles.subtitle),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE4F8EE),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Text('Активна',
-                style: TextStyle(
-                    color: Color(0xFF168A4C), fontWeight: FontWeight.w800)),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  subtitle,
+                  softWrap: true,
+                  style: _Styles.subtitle,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE4F8EE),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'Активна',
+                  style: TextStyle(
+                    color: Color(0xFF168A4C),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -475,23 +531,6 @@ class _SectionLabel extends StatelessWidget {
       );
 }
 
-class _SquareButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _SquareButton({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(width: 48, height: 48, child: Icon(icon, size: 20)),
-        ),
-      );
-}
-
 class _ErrorState extends StatelessWidget {
   final VoidCallback onRetry;
   final String message;
@@ -505,11 +544,6 @@ class _ErrorState extends StatelessWidget {
           children: [
             Row(
               children: [
-                _SquareButton(
-                  icon: Icons.arrow_back_ios_new_rounded,
-                  onTap: () => Navigator.of(context).pop(),
-                ),
-                const SizedBox(width: 18),
                 const Text('Организация', style: _Styles.pageTitle),
               ],
             ),
@@ -564,13 +598,11 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
         children: [
-          Align(
+          const Align(
             alignment: Alignment.centerLeft,
             child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: _SquareButton(
-                  icon: Icons.arrow_back_ios_new_rounded,
-                  onTap: () => Navigator.of(context).pop()),
+              padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
+              child: Text('Организация', style: _Styles.pageTitle),
             ),
           ),
           const Expanded(

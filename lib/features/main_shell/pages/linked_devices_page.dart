@@ -81,7 +81,12 @@ class _LinkedDevicesPageState extends State<LinkedDevicesPage> {
             }
 
             return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                8,
+                20,
+                28 + MediaQuery.paddingOf(context).bottom,
+              ),
               children: [
                 const _LinkedDevicesHeader(),
                 const SizedBox(height: 16),
@@ -187,7 +192,12 @@ class _LinkedDeviceDetailsPageState extends State<LinkedDeviceDetailsPage> {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          28 + MediaQuery.paddingOf(context).bottom,
+        ),
         children: [
           Container(
             padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),

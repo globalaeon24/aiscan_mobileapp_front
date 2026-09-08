@@ -1,11 +1,11 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/scan_result.dart';
 import '../services/profile_service.dart';
 import '../services/scan_service.dart';
+import '../storage/token_storage.dart';
 import '../theme/app_theme.dart';
 import '../widgets/oysyn_controls.dart';
 import 'scan_details_screen.dart';
@@ -36,7 +36,7 @@ class _ScanScreenState extends State<ScanScreen> {
   final _authorController = TextEditingController();
   final _departmentController = TextEditingController();
 
-  File? _file;
+  PlatformFile? _file;
   String _documentType = 'ARTICLE';
   bool _includeOcr = false;
   bool _aiCheck = true;
@@ -57,10 +57,14 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future<void> _loadBalance() async {
     try {
-      final profile = await ProfileService.getProfile();
+      var profile = await ProfileService.getProfile();
+      if (profile['checks_available'] == null) {
+        profile = await TokenStorage.getUser() ?? const {};
+      }
       if (!mounted) return;
       setState(() {
-        _checksAvailable = _asInt(profile['checks_available']);
+        final rawBalance = profile['checks_available'];
+        _checksAvailable = rawBalance == null ? null : _asInt(rawBalance);
         _balanceLoading = false;
       });
     } catch (_) {
@@ -101,20 +105,20 @@ class _ScanScreenState extends State<ScanScreen> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx', 'txt', 'rtf', 'pptx', 'odt'],
+      withData: kIsWeb,
     );
-    final path = result?.files.single.path;
-    if (path == null) return;
-
-    final file = File(path);
-    if (file.lengthSync() > 50 * 1024 * 1024) {
+    final file = result?.files.single;
+    if (file == null) return;
+    if (file.size > 50 * 1024 * 1024) {
       _showMessage('Размер файла не должен превышать 50 МБ.');
       return;
     }
 
     setState(() {
       _file = file;
+      _includeOcr = file.name.toLowerCase().endsWith('.pdf');
       if (_titleController.text.trim().isEmpty) {
-        _titleController.text = _nameWithoutExtension(file.path);
+        _titleController.text = _nameWithoutExtension(file.name);
       }
     });
   }
@@ -122,9 +126,12 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _upload() async {
     try {
       final profile = await ProfileService.getProfile();
-      final available = _asInt(profile['checks_available']);
-      if (mounted) setState(() => _checksAvailable = available);
-      if (available <= 0) {
+      final rawBalance = profile['checks_available'];
+      final available = rawBalance == null ? null : _asInt(rawBalance);
+      if (mounted && available != null) {
+        setState(() => _checksAvailable = available);
+      }
+      if (available != null && available <= 0) {
         _showMessage(
           'Лимит проверок исчерпан. Обратитесь к администратору организации.',
         );
@@ -147,7 +154,7 @@ class _ScanScreenState extends State<ScanScreen> {
         author: _authorController.text,
         department: _departmentController.text,
         documentType: _documentType,
-        includeOcr: _includeOcr,
+        includeOcr: _includeOcr || file.name.toLowerCase().endsWith('.pdf'),
         aiCheck: _aiCheck,
         modules: _modules
             .where((item) =>
@@ -212,7 +219,10 @@ class _ScanScreenState extends State<ScanScreen> {
             child: _FileSelector(
               file: _file,
               onSelect: _pickDocument,
-              onClear: () => setState(() => _file = null),
+              onClear: () => setState(() {
+                _file = null;
+                _includeOcr = false;
+              }),
             ),
           ),
           const SizedBox(height: 13),
@@ -264,6 +274,7 @@ class _ScanScreenState extends State<ScanScreen> {
           const SizedBox(height: 13),
           _SettingsCard(
             includeOcr: _includeOcr,
+            ocrLocked: _file?.name.toLowerCase().endsWith('.pdf') == true,
             aiCheck: _aiCheck,
             onOcrChanged: (value) => setState(() => _includeOcr = value),
             onAiChanged: (value) => setState(() => _aiCheck = value),
@@ -730,7 +741,7 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _FileSelector extends StatelessWidget {
-  final File? file;
+  final PlatformFile? file;
   final VoidCallback onSelect;
   final VoidCallback onClear;
 
@@ -766,7 +777,7 @@ class _FileSelector extends StatelessWidget {
                       borderRadius: BorderRadius.circular(9),
                     ),
                     child: Text(
-                      selected == null ? '+' : _extension(selected.path),
+                      selected == null ? '+' : _extension(selected.name),
                       style: const TextStyle(
                         color: Color(0xFF2F5FE0),
                         fontSize: 9,
@@ -780,9 +791,7 @@ class _FileSelector extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          selected == null
-                              ? 'Выбрать документ'
-                              : _fileName(selected.path),
+                          selected == null ? 'Выбрать документ' : selected.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -965,12 +974,14 @@ class _ModulesCard extends StatelessWidget {
 
 class _SettingsCard extends StatelessWidget {
   final bool includeOcr;
+  final bool ocrLocked;
   final bool aiCheck;
   final ValueChanged<bool> onOcrChanged;
   final ValueChanged<bool> onAiChanged;
 
   const _SettingsCard(
       {required this.includeOcr,
+      required this.ocrLocked,
       required this.aiCheck,
       required this.onOcrChanged,
       required this.onAiChanged});
@@ -984,9 +995,12 @@ class _SettingsCard extends StatelessWidget {
         children: [
           _SettingRow(
               title: 'OCR',
-              subtitle: 'Распознавать текст на сканах PDF',
+              subtitle: ocrLocked
+                  ? 'Для PDF включается автоматически'
+                  : 'Распознавать текст на сканах',
               value: includeOcr,
-              onChanged: onOcrChanged),
+              locked: ocrLocked,
+              onChanged: ocrLocked ? null : onOcrChanged),
           const Divider(height: 1),
           _SettingRow(
               title: 'Проверка ИИ-контента',
@@ -1003,12 +1017,14 @@ class _SettingRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final bool locked;
+  final ValueChanged<bool>? onChanged;
 
   const _SettingRow(
       {required this.title,
       required this.subtitle,
       required this.value,
+      this.locked = false,
       required this.onChanged});
 
   @override
@@ -1031,6 +1047,11 @@ class _SettingRow extends StatelessWidget {
               ],
             ),
           ),
+          if (locked) ...[
+            const Icon(Icons.lock_outline_rounded,
+                size: 17, color: OySynAuthTokens.textMuted),
+            const SizedBox(width: 8),
+          ],
           OySynSwitch(value: value, onChanged: onChanged),
         ],
       ),
@@ -1089,22 +1110,18 @@ BoxDecoration _cardDecoration() => BoxDecoration(
       ],
     );
 
-String _fileName(String path) => path.split(Platform.pathSeparator).last;
-
-String _nameWithoutExtension(String path) {
-  final name = _fileName(path);
+String _nameWithoutExtension(String name) {
   final index = name.lastIndexOf('.');
   return index > 0 ? name.substring(0, index) : name;
 }
 
-String _extension(String path) {
-  final name = _fileName(path);
+String _extension(String name) {
   final index = name.lastIndexOf('.');
   return index > 0 ? name.substring(index + 1).toUpperCase() : 'FILE';
 }
 
-String _fileSize(File file) {
-  final bytes = file.lengthSync();
+String _fileSize(PlatformFile file) {
+  final bytes = file.size;
   if (bytes >= 1024 * 1024) {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} МБ';
   }

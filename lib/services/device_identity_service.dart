@@ -27,7 +27,6 @@ class DeviceIdentityService {
           'platform': 'web',
           'device_name': web.browserName.name,
           'device_model': web.platform,
-          'os_version': web.userAgent,
         });
       } else {
         switch (defaultTargetPlatform) {

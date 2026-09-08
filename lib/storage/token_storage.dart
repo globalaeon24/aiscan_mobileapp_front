@@ -2,10 +2,14 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/scan_result.dart';
+
 class TokenStorage {
   static const _key = 'access_token';
   static const _refreshKey = 'refresh_token';
   static const _userKey = 'current_user';
+  static const _historyKey = 'cached_check_history';
+  static const _notificationsReadAtKey = 'notifications_read_at';
 
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
@@ -40,6 +44,41 @@ class TokenStorage {
     final decoded = jsonDecode(raw);
     if (decoded is Map<String, dynamic>) return decoded;
     return null;
+  }
+
+  static Future<void> saveHistory(List<ScanResult> items) async {
+    final prefs = await SharedPreferences.getInstance();
+    final payload = items.take(100).map((item) => item.toJson()).toList();
+    await prefs.setString(_historyKey, jsonEncode(payload));
+  }
+
+  static Future<List<ScanResult>> getHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_historyKey);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map(ScanResult.fromJson)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<DateTime?> getNotificationsReadAt() async {
+    final prefs = await SharedPreferences.getInstance();
+    return DateTime.tryParse(prefs.getString(_notificationsReadAtKey) ?? '');
+  }
+
+  static Future<void> markNotificationsRead() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _notificationsReadAtKey,
+      DateTime.now().toUtc().toIso8601String(),
+    );
   }
 
   static String displayName(Map<String, dynamic>? user) {
@@ -82,5 +121,7 @@ class TokenStorage {
     await prefs.remove(_key);
     await prefs.remove(_refreshKey);
     await prefs.remove(_userKey);
+    await prefs.remove(_historyKey);
+    await prefs.remove(_notificationsReadAtKey);
   }
 }

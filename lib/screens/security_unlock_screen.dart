@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../services/security_service.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/pin_code_input.dart';
+import '../widgets/oysyn_logo.dart';
 
 class SecurityUnlockScreen extends StatefulWidget {
   const SecurityUnlockScreen({super.key});
@@ -33,6 +35,8 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     setState(() => _checking = false);
 
     if (ok) {
+      await AuthService.refreshSession();
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
       return;
     }
@@ -53,6 +57,8 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
     if (!mounted) return;
 
     if (ok) {
+      await AuthService.refreshSession();
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
       return;
     }
@@ -104,7 +110,7 @@ class _SecurityUnlockScreenState extends State<SecurityUnlockScreen> {
                           ),
                         ],
                       ),
-                      child: Image.asset(OySynAuthTokens.logoAsset),
+                      child: const OySynLogo(size: 54),
                     ),
                     const SizedBox(height: 28),
                     Text(

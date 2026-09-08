@@ -5,13 +5,11 @@ import '../../../theme/app_theme.dart';
 
 class OrganizationBillingPage extends StatefulWidget {
   final int organizationId;
-  final String organizationName;
   final int organizationBalance;
 
   const OrganizationBillingPage({
     super.key,
     required this.organizationId,
-    required this.organizationName,
     required this.organizationBalance,
   });
 
@@ -65,17 +63,8 @@ class _OrganizationBillingPageState extends State<OrganizationBillingPage> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Организация · ${widget.organizationName}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: _Styles.eyebrow),
-                        const Text('Биллинг', style: _Styles.pageTitle),
-                      ],
-                    ),
+                  const Expanded(
+                    child: Text('Биллинг', style: _Styles.pageTitle),
                   ),
                 ],
               ),
@@ -222,12 +211,12 @@ class _BillingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final quota = _int(user['quote']);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: _Styles.card,
       child: Column(children: [
         Row(children: [
           CircleAvatar(
-              radius: 28,
+              radius: 23,
               backgroundColor: const Color(0xFFEFE8FF),
               child: Text(_initials(user),
                   style: const TextStyle(
@@ -249,42 +238,54 @@ class _BillingCard extends StatelessWidget {
               ])),
           const SizedBox(width: 10),
           Column(children: [
-            Text('$quota',
-                style: TextStyle(
-                    color: quota > 0
-                        ? const Color(0xFF168A4C)
-                        : OySynAuthTokens.textMuted,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900)),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 72),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text('$quota',
+                    style: TextStyle(
+                        color: quota > 0
+                            ? const Color(0xFF168A4C)
+                            : OySynAuthTokens.textMuted,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900)),
+              ),
+            ),
             const Text('квота',
                 style:
                     TextStyle(color: OySynAuthTokens.textMuted, fontSize: 11))
           ]),
         ]),
-        const SizedBox(height: 14),
+        const SizedBox(height: 11),
         Row(children: [
           _StepButton(icon: Icons.remove_rounded, onTap: onMinus),
           const SizedBox(width: 10),
           Expanded(
               child: Container(
-                  height: 48,
+                  height: 42,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                       color: const Color(0xFFF6F8FE),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: OySynAuthTokens.divider)),
-                  child: Text('$value',
-                      style: const TextStyle(
-                          color: OySynAuthTokens.textDark,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w900)))),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('$value',
+                          style: const TextStyle(
+                              color: OySynAuthTokens.textDark,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900)),
+                    ),
+                  ))),
           const SizedBox(width: 10),
           _StepButton(icon: Icons.add_rounded, onTap: onPlus),
         ]),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
-          height: 46,
+          height: 42,
           child: FilledButton.icon(
             onPressed: saving || !changed ? null : onApply,
             icon: saving
@@ -297,12 +298,6 @@ class _BillingCard extends StatelessWidget {
             label: Text(saving ? 'Сохранение...' : 'Применить'),
           ),
         ),
-        const SizedBox(height: 9),
-        Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-                'Осталось проверок · ${_roleLabel(user['role']?.toString())}',
-                style: _Styles.subtitle)),
       ]),
     );
   }
@@ -317,7 +312,7 @@ class _StepButton extends StatelessWidget {
       onPressed: onTap,
       icon: Icon(icon),
       style: IconButton.styleFrom(
-          minimumSize: const Size(48, 48),
+          minimumSize: const Size(42, 42),
           backgroundColor: const Color(0xFFF6F8FE),
           side: const BorderSide(color: OySynAuthTokens.divider),
           shape:
@@ -329,10 +324,6 @@ class _Styles {
       color: OySynAuthTokens.textDark,
       fontSize: 24,
       fontWeight: FontWeight.w800);
-  static const eyebrow = TextStyle(
-      color: OySynAuthTokens.textMuted,
-      fontSize: 12,
-      fontWeight: FontWeight.w700);
   static const sectionTitle = TextStyle(
       color: OySynAuthTokens.textDark,
       fontSize: 18,
@@ -372,11 +363,3 @@ String _value(dynamic value, [String fallback = 'Не указано']) {
 
 int _int(dynamic value) =>
     value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0;
-String _roleLabel(String? role) => switch (role) {
-      'MOD' => 'Модератор',
-      'SUP' => 'Супервизор',
-      'ADM' => 'Администратор',
-      'AUT' => 'Автор',
-      'DEC' => 'Деканат',
-      _ => 'Эксперт'
-    };

@@ -113,6 +113,34 @@ class ScanResult {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'status': status,
+        'status_display': statusDisplay,
+        'is_stale': isStale,
+        'document_type': documentType,
+        'user_scan_index': userScanIndex,
+        'file_name': fileName,
+        'author_name': authorName,
+        'department': department,
+        'file_size': fileSize,
+        'modules': modules,
+        'originality_percentage': originalityPercentage,
+        'ai_percentage': aiPercentage,
+        'scanned_text': scannedText,
+        'highlighted_text': highlightedText,
+        'created_at': createdAt.toIso8601String(),
+        'ai_fragments': aiFragments
+            .map((fragment) => {
+                  'start': fragment.start,
+                  'end': fragment.end,
+                  'text': fragment.text,
+                  'confidence': fragment.confidence,
+                })
+            .toList(),
+      };
+
   static int _asInt(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.toInt();

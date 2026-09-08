@@ -6,12 +6,10 @@ import '../../../widgets/oysyn_controls.dart';
 
 class OrganizationUsersPage extends StatefulWidget {
   final int organizationId;
-  final String organizationName;
 
   const OrganizationUsersPage({
     super.key,
     required this.organizationId,
-    required this.organizationName,
   });
 
   @override
@@ -48,7 +46,6 @@ class _OrganizationUsersPageState extends State<OrganizationUsersPage> {
         child: Column(
           children: [
             _Header(
-              organizationName: widget.organizationName,
               onBack: () => Navigator.of(context).pop(),
             ),
             Padding(
@@ -189,21 +186,37 @@ class _OrganizationUsersPageState extends State<OrganizationUsersPage> {
   void _showUser(Map<String, dynamic> user) {
     showModalBottomSheet<void>(
       context: context,
-      showDragHandle: true,
-      backgroundColor: Colors.white,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(22, 4, 22, 28),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_name(user), style: _Styles.title),
-            const SizedBox(height: 14),
-            _InfoRow('Email', _value(user['email'])),
-            _InfoRow('Телефон', _value(user['phone_number'])),
-            _InfoRow('Роль', _roleLabel(user['role']?.toString())),
-            _InfoRow('Проверок осталось', '${_int(user['checks_available'])}'),
-          ],
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SafeArea(
+        top: false,
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .72,
+          ),
+          padding: const EdgeInsets.fromLTRB(22, 10, 22, 22),
+          decoration: const BoxDecoration(
+            color: OySynAuthTokens.appBackground,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(child: _SheetHandle()),
+                const SizedBox(height: 18),
+                Text(_name(user), style: _Styles.title),
+                const SizedBox(height: 14),
+                _InfoRow('Email', _value(user['email'])),
+                _InfoRow('Телефон', _value(user['phone_number'])),
+                _InfoRow('Роль', _roleLabel(user['role']?.toString())),
+                _InfoRow(
+                    'Проверок осталось', '${_int(user['checks_available'])}'),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -253,9 +266,8 @@ class _OrganizationUsersPageState extends State<OrganizationUsersPage> {
 }
 
 class _Header extends StatelessWidget {
-  final String organizationName;
   final VoidCallback onBack;
-  const _Header({required this.organizationName, required this.onBack});
+  const _Header({required this.onBack});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -273,17 +285,8 @@ class _Header extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Организация · $organizationName',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: _Styles.eyebrow),
-                  const Text('Пользователи', style: _Styles.pageTitle),
-                ],
-              ),
+            const Expanded(
+              child: Text('Пользователи', style: _Styles.pageTitle),
             ),
           ],
         ),
@@ -375,19 +378,25 @@ class _UserCard extends StatelessWidget {
                     style: _Styles.subtitle)
               ])),
           const SizedBox(width: 8),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            _StatusBadge(
-                label: _roleLabel(user['role']?.toString()),
-                color: const Color(0xFF6D4EF0),
-                background: const Color(0xFFEFE6FF)),
-            const SizedBox(height: 5),
-            _StatusBadge(
-                label: active ? 'Активен' : 'Заблокирован',
-                color:
-                    active ? const Color(0xFF168A4C) : const Color(0xFFD83B44),
-                background:
-                    active ? const Color(0xFFE4F8EE) : const Color(0xFFFFE7E9)),
-          ]),
+          SizedBox(
+            width: 104,
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              _StatusBadge(
+                  label: _roleLabel(user['role']?.toString()),
+                  color: const Color(0xFF6D4EF0),
+                  background: const Color(0xFFEFE6FF)),
+              const SizedBox(height: 5),
+              _StatusBadge(
+                  label: active ? 'Активен' : 'Заблокирован',
+                  color: active
+                      ? const Color(0xFF168A4C)
+                      : const Color(0xFFD83B44),
+                  background: active
+                      ? const Color(0xFFE4F8EE)
+                      : const Color(0xFFFFE7E9)),
+            ]),
+          ),
         ]),
         const Divider(height: 24, color: OySynAuthTokens.divider),
         Row(mainAxisAlignment: MainAxisAlignment.end, children: [
@@ -444,8 +453,24 @@ class _StatusBadge extends StatelessWidget {
       decoration: BoxDecoration(
           color: background, borderRadius: BorderRadius.circular(9)),
       child: Text(label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
               color: color, fontSize: 12, fontWeight: FontWeight.w800)));
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 42,
+        height: 4,
+        decoration: BoxDecoration(
+          color: const Color(0xFFC9D1E2),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      );
 }
 
 class _UserEditorSheet extends StatefulWidget {
@@ -800,10 +825,6 @@ class _Styles {
       color: OySynAuthTokens.textDark,
       fontSize: 24,
       fontWeight: FontWeight.w800);
-  static const eyebrow = TextStyle(
-      color: OySynAuthTokens.textMuted,
-      fontSize: 12,
-      fontWeight: FontWeight.w700);
   static const title = TextStyle(
       color: OySynAuthTokens.textDark,
       fontSize: 16,

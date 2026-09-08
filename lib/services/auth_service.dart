@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
@@ -33,7 +34,12 @@ class AuthService {
 
     late final http.Response res;
     try {
-      final deviceMetadata = await DeviceIdentityService.loginMetadata();
+      Map<String, dynamic> deviceMetadata;
+      try {
+        deviceMetadata = await DeviceIdentityService.loginMetadata();
+      } catch (_) {
+        deviceMetadata = const {};
+      }
       res = await http
           .post(
             Uri.parse("$baseUrl/auth/login"),
@@ -48,7 +54,9 @@ class AuthService {
     } on TimeoutException {
       lastLoginError = "Сервер отвечает слишком долго. Попробуйте ещё раз.";
       return false;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Auth login request failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
       lastLoginError = "Нет связи с сервером. Проверьте интернет-соединение.";
       return false;
     }
@@ -80,6 +88,38 @@ class AuthService {
 
     lastLoginError = _extractErrorMessage(res);
     return false;
+  }
+
+  static Future<bool> refreshSession() async {
+    final refreshToken = await TokenStorage.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) return false;
+
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/auth/refresh'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refresh_token': refreshToken}),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return false;
+
+      final data = _decodeBody(res.body);
+      if (data is! Map<String, dynamic>) return false;
+      final accessToken = data['access_token']?.toString();
+      final rotatedRefreshToken = data['refresh_token']?.toString();
+      if (accessToken == null || accessToken.isEmpty) return false;
+
+      await TokenStorage.saveToken(accessToken);
+      if (rotatedRefreshToken != null && rotatedRefreshToken.isNotEmpty) {
+        await TokenStorage.saveRefreshToken(rotatedRefreshToken);
+      }
+      final user = data['user'];
+      if (user is Map<String, dynamic>) await TokenStorage.saveUser(user);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   static dynamic _decodeBody(String body) {

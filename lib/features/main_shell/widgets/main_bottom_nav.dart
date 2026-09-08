@@ -5,11 +5,13 @@ import '../../../theme/app_theme.dart';
 class MainBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onChanged;
+  final bool showOrganization;
 
   const MainBottomNav({
     super.key,
     required this.currentIndex,
     required this.onChanged,
+    required this.showOrganization,
   });
 
   @override
@@ -50,15 +52,15 @@ class MainBottomNav extends StatelessWidget {
               label: 'Документы',
               onTap: onChanged,
             ),
-            _NavItem(
-              index: 2,
-              selectedIndex: currentIndex,
-              icon: Icons.add_rounded,
-              selectedIcon: Icons.add_rounded,
-              label: 'Проверить',
-              center: true,
-              onTap: onChanged,
-            ),
+            if (showOrganization)
+              _NavItem(
+                index: 2,
+                selectedIndex: currentIndex,
+                icon: Icons.business_outlined,
+                selectedIcon: Icons.business_rounded,
+                label: 'Организация',
+                onTap: onChanged,
+              ),
             _NavItem(
               index: 3,
               selectedIndex: currentIndex,
@@ -88,7 +90,6 @@ class _NavItem extends StatelessWidget {
   final IconData icon;
   final IconData selectedIcon;
   final String label;
-  final bool center;
   final ValueChanged<int> onTap;
 
   const _NavItem({
@@ -98,7 +99,6 @@ class _NavItem extends StatelessWidget {
     required this.selectedIcon,
     required this.label,
     required this.onTap,
-    this.center = false,
   });
 
   @override
@@ -110,70 +110,39 @@ class _NavItem extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: () => onTap(index),
-        child: Transform.translate(
-          offset: center ? const Offset(0, -10) : Offset.zero,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (center)
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF3E7BFF), Color(0xFF2F5FE0)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color:
-                            OySynAuthTokens.primaryBlue.withValues(alpha: 0.18),
-                        blurRadius: 16,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    selected ? selectedIcon : icon,
-                    color: Colors.white,
-                    size: 27,
-                  ),
-                )
-              else
-                Container(
-                  width: 42,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color:
-                        selected ? const Color(0xFFEAF0FF) : Colors.transparent,
-                    border: selected
-                        ? Border.all(color: const Color(0xFFDCE7FF))
-                        : null,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Icon(
-                    selected ? selectedIcon : icon,
-                    color: color,
-                    size: 23,
-                  ),
-                ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: center ? 10.5 : 11,
-                  height: 1,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  letterSpacing: 0,
-                ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 42,
+              height: 32,
+              decoration: BoxDecoration(
+                color: selected ? const Color(0xFFEAF0FF) : Colors.transparent,
+                border: selected
+                    ? Border.all(color: const Color(0xFFDCE7FF))
+                    : null,
+                borderRadius: BorderRadius.circular(999),
               ),
-            ],
-          ),
+              child: Icon(
+                selected ? selectedIcon : icon,
+                color: color,
+                size: 23,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                height: 1,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
         ),
       ),
     );

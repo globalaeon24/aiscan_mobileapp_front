@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/oysyn_logo.dart';
 
 class LoginRegisterScreen extends StatefulWidget {
   const LoginRegisterScreen({super.key});
@@ -97,24 +98,20 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
         key: const ValueKey('login'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _AuthLabel('Логин'),
-          const SizedBox(height: 10),
           _AuthField(
             controller: _loginEmail,
             icon: Icons.mail_outline_rounded,
-            hintText: 'oysyn@gmail.com',
+            hintText: 'Логин',
             keyboardType: TextInputType.emailAddress,
             validator: (value) => value == null || value.trim().isEmpty
                 ? 'Введите email или логин'
                 : null,
           ),
           const SizedBox(height: 16),
-          const _AuthLabel('Пароль'),
-          const SizedBox(height: 10),
           _AuthField(
             controller: _loginPass,
             icon: Icons.lock_outline_rounded,
-            hintText: '••••••••••',
+            hintText: 'Пароль',
             obscureText: !_passVisible,
             suffixIcon: IconButton(
               onPressed: () => setState(() => _passVisible = !_passVisible),
@@ -235,14 +232,7 @@ class _OySynBrand extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const SizedBox(
-          width: OySynAuthTokens.logoSize,
-          height: OySynAuthTokens.logoSize,
-          child: Image(
-            image: AssetImage(OySynAuthTokens.logoAsset),
-            fit: BoxFit.contain,
-          ),
-        ),
+        const OySynLogo(size: OySynAuthTokens.logoSize),
         const SizedBox(height: 12),
         Text(
           'OySyn',
@@ -260,26 +250,6 @@ class _OySynBrand extends StatelessWidget {
               ),
         ),
       ],
-    );
-  }
-}
-
-class _AuthLabel extends StatelessWidget {
-  final String text;
-
-  const _AuthLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: OySynAuthTokens.textDark,
-        fontSize: 13,
-        height: 1.1,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-      ),
     );
   }
 }
@@ -315,7 +285,7 @@ class _AuthField extends StatelessWidget {
         obscureText: obscureText,
         validator: validator,
         style: const TextStyle(
-          color: OySynAuthTokens.textMuted,
+          color: OySynAuthTokens.textDark,
           fontSize: 16,
           height: 1.1,
           fontWeight: FontWeight.w500,
@@ -435,10 +405,10 @@ class _GoogleAuthButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(OySynAuthTokens.buttonRadius),
           ),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
+            const Text(
               'G',
               style: TextStyle(
                 color: Color(0xFF4285F4),
@@ -446,14 +416,20 @@ class _GoogleAuthButton extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
-            SizedBox(width: 12),
-            Text(
-              'Продолжить с Google',
-              style: TextStyle(
-                color: Color(0xFF3B475F),
-                fontSize: 14.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0,
+            const SizedBox(width: 12),
+            const Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'Продолжить с Google',
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: Color(0xFF3B475F),
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                  ),
+                ),
               ),
             ),
           ],

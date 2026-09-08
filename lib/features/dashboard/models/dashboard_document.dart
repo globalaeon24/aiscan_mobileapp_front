@@ -55,7 +55,7 @@ class DashboardDocument {
 
     return DashboardDocument(
       id: result.id,
-      title: result.title ?? result.fileName ?? 'Документ №${result.id}',
+      title: _displayTitle(result),
       subtitle: details.join(' · '),
       fileName: result.fileName,
       documentType: result.documentType,
@@ -95,7 +95,27 @@ class DashboardDocument {
     };
   }
 
+  static String _displayTitle(ScanResult result) {
+    final title = result.title?.trim();
+    if (title != null && title.isNotEmpty) return title;
+
+    final fileName = result.fileName?.trim();
+    if (fileName == null || fileName.isEmpty) return 'Документ №${result.id}';
+
+    final basename = fileName.split(RegExp(r'[/\\]')).last;
+    final withoutExtension = basename.replaceFirst(RegExp(r'\.[^.]+$'), '');
+
+    // Core storage may append a short random suffix to uploaded file names.
+    return withoutExtension.replaceFirst(RegExp(r'_[A-Za-z0-9]{7}$'), '');
+  }
+
+  bool get hasLowOriginality =>
+      statusType == DocumentStatusType.success &&
+      originalityPercent != null &&
+      originalityPercent! < 60;
+
   Color get statusColor {
+    if (hasLowOriginality) return const Color(0xFFD93D45);
     return switch (statusType) {
       DocumentStatusType.success => const Color(0xFF16A34A),
       DocumentStatusType.processing => const Color(0xFFF59E0B),
@@ -106,6 +126,7 @@ class DashboardDocument {
   }
 
   Color get statusBackground {
+    if (hasLowOriginality) return const Color(0xFFFCE8EA);
     return switch (statusType) {
       DocumentStatusType.success => const Color(0xFFE8F8EF),
       DocumentStatusType.processing => const Color(0xFFFFF3DE),
