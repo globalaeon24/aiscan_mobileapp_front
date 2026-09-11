@@ -8,6 +8,7 @@ import 'screens/mobile_intro_screen.dart';
 import 'screens/security_setup_screen.dart';
 import 'screens/security_unlock_screen.dart';
 import 'services/security_service.dart';
+import 'services/app_update_service.dart';
 import 'storage/token_storage.dart';
 
 /// 🔴 ГЛОБАЛЬНЫЙ navigatorKey
@@ -29,6 +30,11 @@ void main() async {
               : '/security-setup',
     ),
   );
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final context = navigatorKey.currentState?.overlay?.context;
+    if (context != null) AppUpdateService.showIfNeeded(context);
+  });
 }
 
 class ScanAIApp extends StatelessWidget {

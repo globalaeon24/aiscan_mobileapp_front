@@ -8,7 +8,6 @@ import '../services/scan_service.dart';
 import '../storage/token_storage.dart';
 import '../theme/app_theme.dart';
 import '../widgets/oysyn_controls.dart';
-import 'scan_details_screen.dart';
 
 class ScanScreen extends StatefulWidget {
   final void Function(ScanResult)? onScanCompleted;
@@ -58,6 +57,7 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _loadBalance() async {
     try {
       var profile = await ProfileService.getProfile();
+      if (profile.isNotEmpty) await TokenStorage.saveUser(profile);
       if (profile['checks_available'] == null) {
         profile = await TokenStorage.getUser() ?? const {};
       }
@@ -126,6 +126,7 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _upload() async {
     try {
       final profile = await ProfileService.getProfile();
+      if (profile.isNotEmpty) await TokenStorage.saveUser(profile);
       final rawBalance = profile['checks_available'];
       final available = rawBalance == null ? null : _asInt(rawBalance);
       if (mounted && available != null) {
@@ -169,14 +170,7 @@ class _ScanScreenState extends State<ScanScreen> {
       );
       widget.onScanCompleted?.call(scan);
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => ScanDetailsScreen(
-            result: scan,
-            loadFromBackend: true,
-          ),
-        ),
-      );
+      Navigator.of(context).pop(scan);
     } catch (error) {
       if (mounted) _showMessage('Ошибка загрузки: $error');
     } finally {
@@ -397,6 +391,7 @@ class _ModulePickerSheetState extends State<_ModulePickerSheet> {
   Widget build(BuildContext context) {
     final base = widget.modules.where((item) => item.group != 'kz').toList();
     final kz = widget.modules.where((item) => item.group == 'kz').toList();
+    final bottomSystemInset = oysynSystemBottomInset(context);
     return Container(
       height: MediaQuery.sizeOf(context).height * 0.82,
       decoration: const BoxDecoration(
@@ -517,7 +512,12 @@ class _ModulePickerSheetState extends State<_ModulePickerSheet> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              12,
+              20,
+              14 + bottomSystemInset,
+            ),
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: OySynAuthTokens.divider)),

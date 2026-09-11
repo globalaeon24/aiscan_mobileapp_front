@@ -10,6 +10,7 @@ import '../../services/profile_service.dart';
 import '../../screens/scan_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../storage/token_storage.dart';
+import '../../models/scan_result.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -18,14 +19,30 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   int? _organizationId;
+  int _documentsRevision = 0;
+  ScanResult? _recentlyCreatedCheck;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadNavigationAccess();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshProfile();
+    }
   }
 
   Future<void> _loadNavigationAccess() async {
@@ -45,6 +62,21 @@ class _MainShellState extends State<MainShell> {
 
   void _selectPage(int index) {
     setState(() => _selectedIndex = index);
+    _refreshProfile();
+  }
+
+  Future<void> _refreshProfile() async {
+    try {
+      final fresh = await ProfileService.getProfile();
+      if (fresh.isEmpty) return;
+      await TokenStorage.saveUser(fresh);
+      final value = fresh['organization_id'] ?? fresh['core_organization_id'];
+      final organizationId =
+          value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
+      if (mounted && organizationId != _organizationId) {
+        setState(() => _organizationId = organizationId);
+      }
+    } catch (_) {}
   }
 
   Future<void> _openCheck() async {
@@ -69,14 +101,21 @@ class _MainShellState extends State<MainShell> {
     } catch (_) {
       // Форма и сервер выполнят повторную проверку лимита.
     }
-    _navigateToCheck();
+    await _navigateToCheck();
   }
 
-  void _navigateToCheck() {
+  Future<void> _navigateToCheck() async {
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const ScanScreen()),
+    final result = await Navigator.of(context).push<ScanResult>(
+      MaterialPageRoute<ScanResult>(builder: (_) => const ScanScreen()),
     );
+    if (!mounted || result == null) return;
+    setState(() {
+      _recentlyCreatedCheck = result;
+      _documentsRevision++;
+      _selectedIndex = 1;
+    });
+    await _refreshProfile();
   }
 
   @override
@@ -86,7 +125,10 @@ class _MainShellState extends State<MainShell> {
         onCheck: _openCheck,
         onDocuments: () => _selectPage(1),
       ),
-      const DocumentsPage(),
+      DocumentsPage(
+        key: ValueKey(_documentsRevision),
+        pendingResult: _recentlyCreatedCheck,
+      ),
       _organizationId == null
           ? const SizedBox.shrink()
           : OrganizationPage(initialOrganizationId: _organizationId),

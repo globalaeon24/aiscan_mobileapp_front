@@ -5,9 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../config/api_config.dart';
-import '../storage/token_storage.dart';
 import '../models/scan_result.dart';
 import '../models/check_report.dart';
+import 'api_service.dart';
 
 class CheckHistoryPage {
   final List<ScanResult> items;
@@ -31,6 +31,52 @@ class CheckHistoryPage {
     if (count == null || count <= 0) return null;
     return (count / pageSize).ceil();
   }
+}
+
+class DeletedCheck {
+  final ScanResult document;
+  final DateTime? deletedAt;
+  final String createdByName;
+  final String createdByEmail;
+  final String? deletedByName;
+
+  const DeletedCheck({
+    required this.document,
+    required this.deletedAt,
+    required this.createdByName,
+    required this.createdByEmail,
+    required this.deletedByName,
+  });
+
+  factory DeletedCheck.fromJson(Map<String, dynamic> json) {
+    final createdBy = json['created_by'] is Map
+        ? Map<String, dynamic>.from(json['created_by'] as Map)
+        : const <String, dynamic>{};
+    final deletedBy = json['deleted_by'] is Map
+        ? Map<String, dynamic>.from(json['deleted_by'] as Map)
+        : const <String, dynamic>{};
+    return DeletedCheck(
+      document: ScanResult.fromJson(json),
+      deletedAt: DateTime.tryParse(json['deleted_at']?.toString() ?? ''),
+      createdByName: createdBy['full_name']?.toString() ?? '',
+      createdByEmail: createdBy['email']?.toString() ?? '',
+      deletedByName: deletedBy['full_name']?.toString(),
+    );
+  }
+}
+
+class DeletedChecksPage {
+  final List<DeletedCheck> items;
+  final int page;
+  final int pages;
+  final int count;
+
+  const DeletedChecksPage({
+    required this.items,
+    required this.page,
+    required this.pages,
+    required this.count,
+  });
 }
 
 class CheckModule {
@@ -74,32 +120,7 @@ class ScanService {
     List<String>? modules,
     List<String>? modulesKz,
   }) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) {
-      throw Exception("Нет токена авторизации.");
-    }
-
     final uri = Uri.parse("$baseUrl/checks");
-    final request = http.MultipartRequest("POST", uri);
-    request.headers["Authorization"] = "Bearer $token";
-    request.fields["title"] = title == null || title.trim().isEmpty
-        ? _fileTitle(file.name)
-        : title.trim();
-    request.fields["include_ocr"] = includeOcr.toString();
-    request.fields["ocr_languages"] = "rus+kaz+eng";
-    request.fields["ai_check"] = aiCheck.toString();
-    if (modules != null) request.fields['modules'] = modules.join(',');
-    if (modulesKz != null) request.fields['modules_kz'] = modulesKz.join(',');
-    if (author != null && author.trim().isNotEmpty) {
-      request.fields["author"] = author.trim();
-    }
-    if (department != null && department.trim().isNotEmpty) {
-      request.fields["department"] = department.trim();
-    }
-    if (documentType != null && documentType.isNotEmpty) {
-      request.fields["document_type"] = documentType;
-    }
-
     var mediaType = MediaType('application', 'octet-stream');
     final name = file.name.toLowerCase();
 
@@ -119,31 +140,54 @@ class ScanService {
       mediaType = MediaType('text', 'plain');
     }
 
-    final bytes = file.bytes;
-    final path = file.path;
-    if (bytes != null) {
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          "document",
-          bytes,
-          filename: file.name,
-          contentType: mediaType,
-        ),
-      );
-    } else if (path != null && path.isNotEmpty) {
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          "document",
-          path,
-          filename: file.name,
-          contentType: mediaType,
-        ),
-      );
-    } else {
-      throw Exception('Не удалось прочитать выбранный файл.');
-    }
+    final response = await ApiService.sendMultipart((token) async {
+      final request = http.MultipartRequest("POST", uri);
+      request.headers["Authorization"] = "Bearer $token";
+      request.fields["title"] = title == null || title.trim().isEmpty
+          ? _fileTitle(file.name)
+          : title.trim();
+      request.fields["include_ocr"] = includeOcr.toString();
+      request.fields["ocr_languages"] = "rus+kaz+eng";
+      request.fields["ai_check"] = aiCheck.toString();
+      if (modules != null) request.fields['modules'] = modules.join(',');
+      if (modulesKz != null) {
+        request.fields['modules_kz'] = modulesKz.join(',');
+      }
+      if (author != null && author.trim().isNotEmpty) {
+        request.fields["author"] = author.trim();
+      }
+      if (department != null && department.trim().isNotEmpty) {
+        request.fields["department"] = department.trim();
+      }
+      if (documentType != null && documentType.isNotEmpty) {
+        request.fields["document_type"] = documentType;
+      }
 
-    final response = await request.send();
+      final bytes = file.bytes;
+      final path = file.path;
+      if (bytes != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            "document",
+            bytes,
+            filename: file.name,
+            contentType: mediaType,
+          ),
+        );
+      } else if (path != null && path.isNotEmpty) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            "document",
+            path,
+            filename: file.name,
+            contentType: mediaType,
+          ),
+        );
+      } else {
+        throw Exception('Не удалось прочитать выбранный файл.');
+      }
+      return request;
+    });
     final body = await response.stream.bytesToString();
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -191,11 +235,6 @@ class ScanService {
     String? status,
     int? folderId,
   }) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) {
-      throw Exception("Нет токена авторизации.");
-    }
-
     final query = <String, String>{
       "page": "$page",
       "page_size": "$pageSize",
@@ -203,8 +242,7 @@ class ScanService {
       if (folderId != null) "folder_id": "$folderId",
     };
     final uri = Uri.parse("$baseUrl/checks").replace(queryParameters: query);
-    final res =
-        await http.get(uri, headers: {"Authorization": "Bearer $token"});
+    final res = await ApiService.get('/checks?${uri.query}');
 
     if (res.statusCode == 200) {
       final json = jsonDecode(res.body);
@@ -258,12 +296,7 @@ class ScanService {
   }
 
   static Future<void> deleteCheck(int id) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) throw Exception('Нет токена авторизации.');
-    final response = await http.delete(
-      Uri.parse('$baseUrl/checks/$id'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    final response = await ApiService.delete('/checks/$id');
     if (response.statusCode == 405 || response.statusCode == 501) {
       throw Exception('Удаление документов пока не поддерживается Core.');
     }
@@ -272,14 +305,59 @@ class ScanService {
     }
   }
 
-  static Future<List<CheckModule>> getCheckModules() async {
-    final token = await TokenStorage.getToken();
-    if (token == null) throw Exception('Нет токена авторизации.');
-
-    final response = await http.get(
-      Uri.parse('$baseUrl/checks/modules'),
-      headers: {'Authorization': 'Bearer $token'},
+  static Future<DeletedChecksPage> getDeletedChecks(
+    int organizationId, {
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final response = await ApiService.get(
+      '/organizations/$organizationId/checks/deleted?page=$page&page_size=$pageSize',
     );
+    if (response.statusCode != 200) {
+      throw Exception(
+        response.statusCode == 403
+            ? 'Раздел доступен только администратору организации.'
+            : 'Не удалось загрузить удалённые документы (${response.statusCode}).',
+      );
+    }
+    final payload = jsonDecode(response.body);
+    if (payload is! Map<String, dynamic>) {
+      throw Exception('Сервер вернул некорректный список документов.');
+    }
+    final rawItems = payload['results'] is List
+        ? payload['results'] as List
+        : const <dynamic>[];
+    return DeletedChecksPage(
+      items: rawItems
+          .whereType<Map>()
+          .map((item) => DeletedCheck.fromJson(
+                Map<String, dynamic>.from(item),
+              ))
+          .toList(),
+      page: _asInt(payload['page']) ?? page,
+      pages: _asInt(payload['pages']) ?? 1,
+      count: _asInt(payload['count']) ?? rawItems.length,
+    );
+  }
+
+  static Future<void> restoreDeletedCheck(
+    int organizationId,
+    int checkId,
+  ) async {
+    final response = await ApiService.post(
+      '/organizations/$organizationId/checks/$checkId/restore',
+    );
+    if (response.statusCode != 200) {
+      throw Exception(
+        response.statusCode == 403
+            ? 'Восстановление доступно только администратору организации.'
+            : 'Не удалось восстановить документ (${response.statusCode}).',
+      );
+    }
+  }
+
+  static Future<List<CheckModule>> getCheckModules() async {
+    final response = await ApiService.get('/checks/modules');
     if (response.statusCode != 200) {
       throw Exception('Не удалось загрузить модули: ${response.statusCode}');
     }
@@ -291,12 +369,7 @@ class ScanService {
   }
 
   static Future<List<Map<String, dynamic>>> getFolders() async {
-    final token = await TokenStorage.getToken();
-    if (token == null) throw Exception('Нет токена авторизации.');
-    final response = await http.get(
-      Uri.parse('$baseUrl/folders'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    final response = await ApiService.get('/folders');
     if (response.statusCode != 200) {
       throw Exception('Не удалось загрузить папки: ${response.statusCode}');
     }
@@ -309,14 +382,7 @@ class ScanService {
   /// 5) Детальный результат
   /// ================================================================
   static Future<ScanResult> getScanById(int id) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) {
-      throw Exception("Нет токена.");
-    }
-
-    final uri = Uri.parse("$baseUrl/checks/$id");
-    final res =
-        await http.get(uri, headers: {"Authorization": "Bearer $token"});
+    final res = await ApiService.get('/checks/$id');
 
     if (res.statusCode == 200) {
       return ScanResult.fromJson(jsonDecode(res.body));
@@ -328,13 +394,7 @@ class ScanService {
   }
 
   static Future<CheckReport> getReport(int id) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) throw Exception('Нет токена авторизации.');
-
-    final response = await http.get(
-      Uri.parse('$baseUrl/checks/$id/report'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    final response = await ApiService.get('/checks/$id/report');
     if (response.statusCode != 200) {
       throw Exception('Отчёт пока недоступен: ${response.statusCode}');
     }
@@ -346,15 +406,11 @@ class ScanService {
     String reportType = 'certificate',
     String language = 'ru',
   }) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) throw Exception('Нет токена авторизации.');
-
-    final uri = Uri.parse('$baseUrl/checks/$id/report/pdf/$reportType')
-        .replace(queryParameters: {'lang': language});
-    final response = await http.get(
-      uri,
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    final uri =
+        Uri(path: '/checks/$id/report/pdf/$reportType', queryParameters: {
+      'lang': language,
+    });
+    final response = await ApiService.get(uri.toString());
     if (response.statusCode != 200) {
       throw Exception('Не удалось получить PDF: ${response.statusCode}');
     }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/scan_result.dart';
@@ -10,6 +11,9 @@ class TokenStorage {
   static const _userKey = 'current_user';
   static const _historyKey = 'cached_check_history';
   static const _notificationsReadAtKey = 'notifications_read_at';
+
+  static final ValueNotifier<Map<String, dynamic>?> userListenable =
+      ValueNotifier<Map<String, dynamic>?>(null);
 
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
@@ -22,8 +26,10 @@ class TokenStorage {
   }
 
   static Future<void> saveUser(Map<String, dynamic> user) async {
+    final snapshot = Map<String, dynamic>.from(user);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_userKey, jsonEncode(user));
+    await prefs.setString(_userKey, jsonEncode(snapshot));
+    userListenable.value = snapshot;
   }
 
   static Future<String?> getToken() async {
@@ -42,7 +48,10 @@ class TokenStorage {
     if (raw == null || raw.isEmpty) return null;
 
     final decoded = jsonDecode(raw);
-    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map<String, dynamic>) {
+      userListenable.value = decoded;
+      return decoded;
+    }
     return null;
   }
 
@@ -123,5 +132,6 @@ class TokenStorage {
     await prefs.remove(_userKey);
     await prefs.remove(_historyKey);
     await prefs.remove(_notificationsReadAtKey);
+    userListenable.value = null;
   }
 }

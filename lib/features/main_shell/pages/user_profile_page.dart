@@ -4,6 +4,7 @@ import '../../../services/profile_service.dart';
 import '../../../services/security_service.dart';
 import '../../../storage/token_storage.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/oysyn_controls.dart';
 import '../../../widgets/pin_code_input.dart';
 
 class UserProfilePage extends StatefulWidget {
@@ -71,86 +72,92 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: _profile,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            snapshot.data == null) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final user = snapshot.data ?? const <String, dynamic>{};
-        return ListView(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            18,
-            20,
-            112 + MediaQuery.paddingOf(context).bottom,
-          ),
-          children: [
-            const _PageHeader(),
-            const SizedBox(height: 18),
-            _IdentityCard(user: user),
-            const SizedBox(height: 16),
-            _Tabs(
-                selected: _tab,
-                onChanged: (value) => setState(() => _tab = value)),
-            const SizedBox(height: 16),
-            switch (_tab) {
-              0 => Column(
-                  children: [
-                    _AccountCard(
-                      user: user,
-                      onEdit: () => _editProfile(user),
-                    ),
-                  ],
-                ),
-              1 => const _InfoCard(
-                  icon: Icons.notifications_none_rounded,
-                  title: 'Уведомления',
-                  text:
-                      'Здесь будут отображаться важные уведомления аккаунта.'),
-              _ => Column(
-                  children: [
-                    _NavigationCard(
-                      icon: Icons.shield_outlined,
-                      title: 'Защита аккаунта',
-                      subtitle: 'Изменить PIN-код входа',
-                      onTap: _changePin,
-                    ),
-                    const SizedBox(height: 14),
-                    _NavigationCard(
-                      icon: Icons.devices_rounded,
-                      title: 'Связанные устройства',
-                      subtitle: 'Активные веб-сессии',
-                      onTap: () =>
-                          Navigator.of(context).pushNamed('/linked-devices'),
-                    ),
-                  ],
-                ),
-            },
-            if (_tab == 0) ...[
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  onPressed: _logout,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFDF3E48),
-                    side: const BorderSide(color: Color(0xFFF1B7BC)),
-                    textStyle: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
+    return ValueListenableBuilder<Map<String, dynamic>?>(
+      valueListenable: TokenStorage.userListenable,
+      builder: (context, currentUser, _) =>
+          FutureBuilder<Map<String, dynamic>?>(
+        future: _profile,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              snapshot.data == null &&
+              currentUser == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final user =
+              currentUser ?? snapshot.data ?? const <String, dynamic>{};
+          return ListView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              18,
+              20,
+              112 + MediaQuery.paddingOf(context).bottom,
+            ),
+            children: [
+              const _PageHeader(),
+              const SizedBox(height: 18),
+              _IdentityCard(user: user),
+              const SizedBox(height: 16),
+              _Tabs(
+                  selected: _tab,
+                  onChanged: (value) => setState(() => _tab = value)),
+              const SizedBox(height: 16),
+              switch (_tab) {
+                0 => Column(
+                    children: [
+                      _AccountCard(
+                        user: user,
+                        onEdit: () => _editProfile(user),
+                      ),
+                    ],
                   ),
-                  icon: const Icon(Icons.logout_rounded),
-                  label: const Text('Выйти из аккаунта'),
+                1 => const _InfoCard(
+                    icon: Icons.notifications_none_rounded,
+                    title: 'Уведомления',
+                    text:
+                        'Здесь будут отображаться важные уведомления аккаунта.'),
+                _ => Column(
+                    children: [
+                      _NavigationCard(
+                        icon: Icons.shield_outlined,
+                        title: 'Защита аккаунта',
+                        subtitle: 'Изменить PIN-код входа',
+                        onTap: _changePin,
+                      ),
+                      const SizedBox(height: 14),
+                      _NavigationCard(
+                        icon: Icons.devices_rounded,
+                        title: 'Связанные устройства',
+                        subtitle: 'Активные веб-сессии',
+                        onTap: () =>
+                            Navigator.of(context).pushNamed('/linked-devices'),
+                      ),
+                    ],
+                  ),
+              },
+              if (_tab == 0) ...[
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    onPressed: _logout,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDF3E48),
+                      side: const BorderSide(color: Color(0xFFF1B7BC)),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Выйти из аккаунта'),
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -390,7 +397,16 @@ class _ProfileEditorState extends State<_ProfileEditor> {
         'middle_name': _middleName.text.trim(),
         'phone_number': _phone.text.trim(),
       });
-      if (mounted) Navigator.of(context).pop(updated);
+      final merged = <String, dynamic>{...widget.user, ...updated};
+      final nameParts = [
+        merged['last_name'],
+        merged['first_name'],
+        merged['middle_name'],
+      ]
+          .map((value) => value?.toString().trim() ?? '')
+          .where((v) => v.isNotEmpty);
+      merged['full_name'] = nameParts.join(' ');
+      if (mounted) Navigator.of(context).pop(merged);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -408,7 +424,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
         20,
         12,
         20,
-        20 + MediaQuery.viewInsetsOf(context).bottom,
+        20 + oysynInteractiveBottomInset(context),
       ),
       decoration: const BoxDecoration(
         color: OySynAuthTokens.appBackground,
@@ -568,7 +584,7 @@ class _ChangePinSheetState extends State<_ChangePinSheet> {
         20,
         12,
         20,
-        20 + MediaQuery.viewInsetsOf(context).bottom,
+        20 + oysynInteractiveBottomInset(context),
       ),
       decoration: const BoxDecoration(
         color: OySynAuthTokens.appBackground,

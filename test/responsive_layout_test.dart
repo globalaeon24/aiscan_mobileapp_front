@@ -28,6 +28,7 @@ void main() {
             size: size,
             padding: const EdgeInsets.only(bottom: 24),
             viewPadding: const EdgeInsets.only(bottom: 24),
+            systemGestureInsets: const EdgeInsets.only(bottom: 32),
           ),
           child: child,
         ),
@@ -112,6 +113,14 @@ void main() {
     await tester.tap(find.text('Открыть'));
     await tester.pumpAndSettle();
     expect(find.text('Длинный список вариантов'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Вариант 20'),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    final lastChoice = tester.getRect(find.text('Вариант 20'));
+    expect(lastChoice.bottom, lessThanOrEqualTo(compactAndroid.height - 32));
     expect(tester.takeException(), isNull);
   });
 }

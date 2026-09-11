@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../models/scan_result.dart';
@@ -9,6 +11,7 @@ import '../../../widgets/oysyn_controls.dart';
 import '../../dashboard/models/dashboard_document.dart';
 import '../../dashboard/widgets/document_card.dart';
 import '../utils/document_list_filter.dart';
+import 'deleted_documents_page.dart';
 
 enum _PeriodFilter {
   all('Все', null),
@@ -23,7 +26,9 @@ enum _PeriodFilter {
 }
 
 class DocumentsPage extends StatefulWidget {
-  const DocumentsPage({super.key});
+  final ScanResult? pendingResult;
+
+  const DocumentsPage({super.key, this.pendingResult});
 
   @override
   State<DocumentsPage> createState() => _DocumentsPageState();
@@ -34,6 +39,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  Timer? _refreshTimer;
   late Future<List<ScanResult>> _future;
   _PeriodFilter _period = _PeriodFilter.all;
   String? _statusFilter;
@@ -57,6 +63,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -65,15 +72,41 @@ class _DocumentsPageState extends State<DocumentsPage> {
   Future<List<ScanResult>> _load() async {
     try {
       final items = await ScanService.getAllHistory(folderId: _folderId);
+      final pending = widget.pendingResult;
+      if (_folderId == null &&
+          pending != null &&
+          !items.any((item) => item.id == pending.id)) {
+        items.insert(0, pending);
+      }
+      _scheduleRefresh(items);
       if (_folderId == null) await TokenStorage.saveHistory(items);
       return items;
     } catch (_) {
       if (_folderId == null) {
         final cached = await TokenStorage.getHistory();
-        if (cached.isNotEmpty) return cached;
+        final pending = widget.pendingResult;
+        if (pending != null && !cached.any((item) => item.id == pending.id)) {
+          cached.insert(0, pending);
+        }
+        if (cached.isNotEmpty) {
+          _scheduleRefresh(cached);
+          return cached;
+        }
       }
       rethrow;
     }
+  }
+
+  void _scheduleRefresh(List<ScanResult> items) {
+    _refreshTimer?.cancel();
+    final hasPending = items
+        .map(DashboardDocument.fromScanResult)
+        .any((document) => !document.isTerminal);
+    if (!hasPending) return;
+    _refreshTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      setState(() => _future = _load());
+    });
   }
 
   Future<void> _refresh() async {
@@ -166,6 +199,19 @@ class _DocumentsPageState extends State<DocumentsPage> {
     });
   }
 
+  void _openDeletedDocuments(Map<String, dynamic>? user) {
+    if (user == null || user['role']?.toString().toUpperCase() != 'ADM') return;
+    final rawId = user['organization_id'] ?? user['core_organization_id'];
+    final organizationId =
+        rawId is num ? rawId.toInt() : int.tryParse(rawId?.toString() ?? '');
+    if (organizationId == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DeletedDocumentsPage(organizationId: organizationId),
+      ),
+    );
+  }
+
   List<ScanResult> _filteredItems(List<ScanResult> items) {
     return DocumentListFilter.apply(
       items: items,
@@ -213,6 +259,34 @@ class _DocumentsPageState extends State<DocumentsPage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   const SizedBox(width: 10),
+                  ValueListenableBuilder<Map<String, dynamic>?>(
+                    valueListenable: TokenStorage.userListenable,
+                    builder: (context, user, _) {
+                      final rawId = user?['organization_id'] ??
+                          user?['core_organization_id'];
+                      final isAdmin =
+                          user?['role']?.toString().toUpperCase() == 'ADM' &&
+                              rawId != null;
+                      if (!isAdmin) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: IconButton(
+                          onPressed: () => _openDeletedDocuments(user),
+                          tooltip: 'Удалённые документы',
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            side: const BorderSide(
+                              color: OySynAuthTokens.divider,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                   IconButton(
                     onPressed: _showFolders,
                     tooltip: 'Папки',
@@ -276,18 +350,22 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 )
               else
                 for (final result in visible) ...[
-                  DocumentCard(
-                    document: DashboardDocument.fromScanResult(result),
-                    detailed: true,
-                    onTap: () => _openResult(result),
-                    action: IconButton(
-                      onPressed: () => _deleteDocument(result),
-                      tooltip: 'Удалить документ',
-                      icon: const Icon(Icons.delete_outline_rounded),
-                      color: const Color(0xFFDF3E48),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
+                  Builder(builder: (context) {
+                    final document = DashboardDocument.fromScanResult(result);
+                    return DocumentCard(
+                      document: document,
+                      detailed: true,
+                      onTap:
+                          document.canOpen ? () => _openResult(result) : null,
+                      action: IconButton(
+                        onPressed: () => _deleteDocument(result),
+                        tooltip: 'Удалить документ',
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        color: const Color(0xFFDF3E48),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    );
+                  }),
                   const SizedBox(height: 8),
                 ],
               if (_documentTab == 0 &&
@@ -543,7 +621,12 @@ class _FoldersSheet extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         constraints:
             BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .7),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          24 + oysynSystemBottomInset(context),
+        ),
         decoration: const BoxDecoration(
           color: OySynAuthTokens.appBackground,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),

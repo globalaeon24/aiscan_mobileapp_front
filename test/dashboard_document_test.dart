@@ -56,4 +56,27 @@ void main() {
 
     expect(document.statusColor, const Color(0xFF16A34A));
   });
+
+  test('processing checks hide results and cannot be opened', () {
+    final document = DashboardDocument.fromScanResult(
+      result(originality: 0, status: 'PR'),
+    );
+
+    expect(document.statusText, 'Проверка');
+    expect(document.originalityPercent, isNull);
+    expect(document.aiPercent, isNull);
+    expect(document.canOpen, isFalse);
+    expect(document.isTerminal, isFalse);
+  });
+
+  test('completed checks expose results and can be opened', () {
+    final document = DashboardDocument.fromScanResult(
+      result(originality: 86, status: 'CH'),
+    );
+
+    expect(document.statusText, isNull);
+    expect(document.originalityPercent, 86);
+    expect(document.canOpen, isTrue);
+    expect(document.isTerminal, isTrue);
+  });
 }

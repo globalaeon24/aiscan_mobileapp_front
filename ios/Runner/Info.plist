@@ -9,7 +9,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Ai Scan Text</string>
+	<string>OySyn</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -17,7 +17,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>ai_scan_text</string>
+	<string>OySyn</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -32,6 +32,8 @@
 	<string>Камера нужна для сканирования QR-кода входа в OySyn.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Face ID используется для быстрого и безопасного входа в OySyn.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Доступ к медиатеке нужен, чтобы выбрать изображение или документ для проверки в OySyn.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

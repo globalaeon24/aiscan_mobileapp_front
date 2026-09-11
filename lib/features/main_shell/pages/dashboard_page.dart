@@ -107,98 +107,109 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_DashboardData>(
-      future: _future,
-      builder: (context, snapshot) {
-        final data = snapshot.data;
+    return ValueListenableBuilder<Map<String, dynamic>?>(
+      valueListenable: TokenStorage.userListenable,
+      builder: (context, currentUser, _) => FutureBuilder<_DashboardData>(
+        future: _future,
+        builder: (context, snapshot) {
+          final data = snapshot.data;
+          final user = currentUser ?? data?.user;
+          final checksAvailable = _asNullableInt(user?['checks_available']);
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            setState(() => _future = _load());
-            await _future;
-          },
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: DashboardHeader(
-                  checksAvailable: data?.checksAvailable,
-                  recentResults: data?.results ?? const [],
+          return RefreshIndicator(
+            onRefresh: () async {
+              setState(() => _future = _load());
+              await _future;
+            },
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: DashboardHeader(
+                    checksAvailable: checksAvailable,
+                    recentResults: data?.results ?? const [],
+                  ),
                 ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
-                sliver: SliverList.list(
-                  children: [
-                    Text(
-                      'Привет, ${TokenStorage.displayName(data?.user)}',
-                      style: OySynTextStyles.welcomeTitle,
-                    ),
-                    const SizedBox(height: 14),
-                    _UploadAction(
-                      onTap: widget.onCheck,
-                      enabled: data?.checksAvailable == null ||
-                          data!.checksAvailable! > 0,
-                    ),
-                    const SizedBox(height: 14),
-                    if (data != null && data.totalDocuments > 0)
-                      MonthSummaryCard(
-                        totalDocuments: data.totalDocuments,
-                        averageOriginality: data.averageOriginality,
-                        monthlyDocuments: data.monthlyDocuments,
-                      )
-                    else
-                      const _NewUserGuide(),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Последние проверки',
-                            style: OySynTextStyles.recentDocumentsTitle,
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
+                  sliver: SliverList.list(
+                    children: [
+                      Text(
+                        'Привет, ${TokenStorage.displayName(user)}',
+                        style: OySynTextStyles.welcomeTitle,
+                      ),
+                      const SizedBox(height: 14),
+                      _UploadAction(
+                        onTap: widget.onCheck,
+                        enabled: checksAvailable == null || checksAvailable > 0,
+                      ),
+                      const SizedBox(height: 14),
+                      if (data != null && data.totalDocuments > 0)
+                        MonthSummaryCard(
+                          totalDocuments: data.totalDocuments,
+                          averageOriginality: data.averageOriginality,
+                          monthlyDocuments: data.monthlyDocuments,
+                        )
+                      else
+                        const _NewUserGuide(),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Последние проверки',
+                              style: OySynTextStyles.recentDocumentsTitle,
+                            ),
                           ),
-                        ),
-                        TextButton(
-                          onPressed: widget.onDocuments,
-                          child: const Text('Все'),
-                        ),
-                        if (snapshot.connectionState == ConnectionState.waiting)
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                          TextButton(
+                            onPressed: widget.onDocuments,
+                            child: const Text('Все'),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    if (snapshot.hasError)
-                      _DashboardMessage(
-                        icon: Icons.wifi_off_rounded,
-                        text: 'Не удалось загрузить документы',
-                        detail: snapshot.error.toString(),
-                      )
-                    else if (data != null && data.documents.isEmpty)
-                      const _DashboardMessage(
-                        icon: Icons.description_outlined,
-                        text: 'Документов пока нет',
-                        detail: 'Загрузи первый документ для проверки',
-                      )
-                    else
-                      for (final result
-                          in (data?.results ?? const <ScanResult>[])
-                              .take(6)) ...[
-                        DocumentCard(
-                          document: DashboardDocument.fromScanResult(result),
-                          onTap: () => _openResult(context, result),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                  ],
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting)
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      if (snapshot.hasError)
+                        _DashboardMessage(
+                          icon: Icons.wifi_off_rounded,
+                          text: 'Не удалось загрузить документы',
+                          detail: snapshot.error.toString(),
+                        )
+                      else if (data != null && data.documents.isEmpty)
+                        const _DashboardMessage(
+                          icon: Icons.description_outlined,
+                          text: 'Документов пока нет',
+                          detail: 'Загрузи первый документ для проверки',
+                        )
+                      else
+                        for (final result
+                            in (data?.results ?? const <ScanResult>[])
+                                .take(6)) ...[
+                          Builder(builder: (context) {
+                            final document =
+                                DashboardDocument.fromScanResult(result);
+                            return DocumentCard(
+                              document: document,
+                              onTap: document.canOpen
+                                  ? () => _openResult(context, result)
+                                  : null,
+                            );
+                          }),
+                          const SizedBox(height: 10),
+                        ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

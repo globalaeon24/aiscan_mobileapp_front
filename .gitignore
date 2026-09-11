@@ -54,6 +54,8 @@ app.*.map.json
 id_rsa*
 id_ed25519*
 *@*
+!ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png
+!ios/Runner/Assets.xcassets/LaunchImage.imageset/*.png
 
 # Test and coverage output
 coverage/

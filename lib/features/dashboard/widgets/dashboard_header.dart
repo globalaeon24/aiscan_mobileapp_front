@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../storage/token_storage.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/oysyn_controls.dart';
 import '../../../widgets/oysyn_logo.dart';
 import '../../../models/scan_result.dart';
 import '../models/dashboard_document.dart';
@@ -148,7 +149,12 @@ class _NotificationsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          24 + oysynSystemBottomInset(context),
+        ),
         decoration: const BoxDecoration(
           color: OySynAuthTokens.appBackground,
           borderRadius: BorderRadius.vertical(top: Radius.circular(22)),

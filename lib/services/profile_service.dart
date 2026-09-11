@@ -1,29 +1,18 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
-import '../storage/token_storage.dart';
+import 'api_service.dart';
 
 class ProfileService {
   static const baseUrl = ApiConfig.baseUrl;
 
   static Future<Map<String, dynamic>> getProfile() async {
-    final token = await TokenStorage.getToken();
-    if (token == null) {
-      throw Exception("Нет токена авторизации.");
-    }
-
-    final res = await http.get(
-      Uri.parse("$baseUrl/me"),
-      headers: {
-        "Authorization": "Bearer $token",
-      },
-    );
+    final res = await ApiService.get('/me');
 
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     } else {
-      return {};
+      throw Exception('Не удалось загрузить профиль (${res.statusCode}).');
     }
   }
 
@@ -31,27 +20,23 @@ class ProfileService {
     Map<String, dynamic> payload,
   ) async {
     final data = await _send('PATCH', '/me', payload);
-    return data is Map<String, dynamic> ? data : const {};
+    final updated = data is Map<String, dynamic> ? data : <String, dynamic>{};
+    try {
+      final fresh = await getProfile();
+      return {...fresh, ...updated, ...payload};
+    } catch (_) {
+      return {...updated, ...payload};
+    }
   }
 
   static Future<Map<String, dynamic>> getOrganization(
       int organizationId) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) {
-      throw Exception("Нет токена авторизации.");
-    }
-
-    final res = await http.get(
-      Uri.parse("$baseUrl/organizations/$organizationId"),
-      headers: {
-        "Authorization": "Bearer $token",
-      },
-    );
+    final res = await ApiService.get('/organizations/$organizationId');
 
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     } else {
-      return {};
+      throw Exception('Не удалось загрузить организацию (${res.statusCode}).');
     }
   }
 
@@ -133,12 +118,7 @@ class ProfileService {
   }
 
   static Future<dynamic> _get(String path) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) throw Exception('Нет токена авторизации.');
-    final response = await http.get(
-      Uri.parse('$baseUrl$path'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    final response = await ApiService.get(path);
     if (response.statusCode != 200) {
       throw Exception('Не удалось загрузить данные (${response.statusCode}).');
     }
@@ -150,19 +130,16 @@ class ProfileService {
     String path,
     Map<String, dynamic> payload,
   ) async {
-    final token = await TokenStorage.getToken();
-    if (token == null) throw Exception('Нет токена авторизации.');
-    final request = http.Request(method, Uri.parse('$baseUrl$path'))
-      ..headers.addAll({
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      })
-      ..body = jsonEncode(payload);
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
+    final response = switch (method) {
+      'PATCH' => await ApiService.patch(path, body: payload),
+      'POST' => await ApiService.post(path, body: payload),
+      _ => throw UnsupportedError('Неподдерживаемый HTTP-метод: $method'),
+    };
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Не удалось сохранить данные (${response.statusCode}).');
     }
-    return jsonDecode(response.body);
+    return response.body.isEmpty
+        ? const <String, dynamic>{}
+        : jsonDecode(response.body);
   }
 }

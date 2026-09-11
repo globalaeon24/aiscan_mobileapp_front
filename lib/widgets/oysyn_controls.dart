@@ -1,6 +1,23 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+
+double oysynSystemBottomInset(BuildContext context) {
+  final mediaQuery = MediaQuery.of(context);
+  return math.max(
+    mediaQuery.viewPadding.bottom,
+    mediaQuery.systemGestureInsets.bottom,
+  );
+}
+
+double oysynInteractiveBottomInset(BuildContext context) {
+  return math.max(
+    MediaQuery.viewInsetsOf(context).bottom,
+    oysynSystemBottomInset(context),
+  );
+}
 
 class OySynChoice<T> {
   final T value;
@@ -21,119 +38,120 @@ Future<T?> showOySynChoiceSheet<T>(
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => SafeArea(
-      top: false,
-      child: Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .72,
-        ),
-        decoration: const BoxDecoration(
-          color: OySynAuthTokens.appBackground,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFC9D1E2),
-                borderRadius: BorderRadius.circular(2),
-              ),
+    builder: (context) => Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .72,
+      ),
+      decoration: const BoxDecoration(
+        color: OySynAuthTokens.appBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 42,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFC9D1E2),
+              borderRadius: BorderRadius.circular(2),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 17, 12, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: OySynAuthTokens.textDark,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 17, 12, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: OySynAuthTokens.textDark,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    tooltip: 'Закрыть',
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: 'Закрыть',
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
             ),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                itemCount: choices.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final choice = choices[index];
-                  final active = choice.value == selected;
-                  return Material(
-                    color: active ? const Color(0xFFEAF0FF) : Colors.white,
+          ),
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                20 + oysynSystemBottomInset(context),
+              ),
+              itemCount: choices.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final choice = choices[index];
+                final active = choice.value == selected;
+                return Material(
+                  color: active ? const Color(0xFFEAF0FF) : Colors.white,
+                  borderRadius: BorderRadius.circular(13),
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).pop(choice.value),
                     borderRadius: BorderRadius.circular(13),
-                    child: InkWell(
-                      onTap: () => Navigator.of(context).pop(choice.value),
-                      borderRadius: BorderRadius.circular(13),
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 54),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 15,
-                          vertical: 12,
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 54),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: active
+                              ? const Color(0xFF9DB6FA)
+                              : OySynAuthTokens.divider,
                         ),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: active
-                                ? const Color(0xFF9DB6FA)
-                                : OySynAuthTokens.divider,
-                          ),
-                          borderRadius: BorderRadius.circular(13),
-                        ),
-                        child: Row(
-                          children: [
-                            if (choice.icon != null) ...[
-                              Icon(
-                                choice.icon,
-                                size: 20,
-                                color: active
-                                    ? OySynAuthTokens.primaryBlue
-                                    : OySynAuthTokens.textMuted,
-                              ),
-                              const SizedBox(width: 12),
-                            ],
-                            Expanded(
-                              child: Text(
-                                choice.label,
-                                style: TextStyle(
-                                  color: OySynAuthTokens.textDark,
-                                  fontSize: 15,
-                                  fontWeight: active
-                                      ? FontWeight.w800
-                                      : FontWeight.w600,
-                                ),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Row(
+                        children: [
+                          if (choice.icon != null) ...[
+                            Icon(
+                              choice.icon,
+                              size: 20,
+                              color: active
+                                  ? OySynAuthTokens.primaryBlue
+                                  : OySynAuthTokens.textMuted,
+                            ),
+                            const SizedBox(width: 12),
+                          ],
+                          Expanded(
+                            child: Text(
+                              choice.label,
+                              style: TextStyle(
+                                color: OySynAuthTokens.textDark,
+                                fontSize: 15,
+                                fontWeight:
+                                    active ? FontWeight.w800 : FontWeight.w600,
                               ),
                             ),
-                            if (active)
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                color: OySynAuthTokens.primaryBlue,
-                                size: 21,
-                              ),
-                          ],
-                        ),
+                          ),
+                          if (active)
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: OySynAuthTokens.primaryBlue,
+                              size: 21,
+                            ),
+                        ],
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );

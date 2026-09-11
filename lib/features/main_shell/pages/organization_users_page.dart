@@ -142,7 +142,7 @@ class _OrganizationUsersPageState extends State<OrganizationUsersPage> {
                 20,
                 12,
                 20,
-                14 + MediaQuery.viewPaddingOf(context).bottom,
+                14 + oysynSystemBottomInset(context),
               ),
               color: Colors.white,
               child: Column(
@@ -189,33 +189,35 @@ class _OrganizationUsersPageState extends State<OrganizationUsersPage> {
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => SafeArea(
-        top: false,
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * .72,
-          ),
-          padding: const EdgeInsets.fromLTRB(22, 10, 22, 22),
-          decoration: const BoxDecoration(
-            color: OySynAuthTokens.appBackground,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Center(child: _SheetHandle()),
-                const SizedBox(height: 18),
-                Text(_name(user), style: _Styles.title),
-                const SizedBox(height: 14),
-                _InfoRow('Email', _value(user['email'])),
-                _InfoRow('Телефон', _value(user['phone_number'])),
-                _InfoRow('Роль', _roleLabel(user['role']?.toString())),
-                _InfoRow(
-                    'Проверок осталось', '${_int(user['checks_available'])}'),
-              ],
-            ),
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .72,
+        ),
+        padding: EdgeInsets.fromLTRB(
+          22,
+          10,
+          22,
+          22 + oysynSystemBottomInset(context),
+        ),
+        decoration: const BoxDecoration(
+          color: OySynAuthTokens.appBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Center(child: _SheetHandle()),
+              const SizedBox(height: 18),
+              Text(_name(user), style: _Styles.title),
+              const SizedBox(height: 14),
+              _InfoRow('Email', _value(user['email'])),
+              _InfoRow('Телефон', _value(user['phone_number'])),
+              _InfoRow('Роль', _roleLabel(user['role']?.toString())),
+              _InfoRow(
+                  'Проверок осталось', '${_int(user['checks_available'])}'),
+            ],
           ),
         ),
       ),
@@ -546,7 +548,7 @@ class _UserEditorSheetState extends State<_UserEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomInset = oysynInteractiveBottomInset(context);
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       padding: EdgeInsets.only(bottom: bottomInset),

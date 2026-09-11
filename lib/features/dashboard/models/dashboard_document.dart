@@ -67,7 +67,7 @@ class DashboardDocument {
           ? 'Проверка не завершена'
           : statusType == DocumentStatusType.success
               ? null
-              : (result.statusDisplay ?? _statusLabel(result.status)),
+              : _statusLabel(result.status),
       statusType: statusType,
       createdAt: result.createdAt,
     );
@@ -87,8 +87,8 @@ class DashboardDocument {
   static String _statusLabel(String? status) {
     return switch (status?.toUpperCase()) {
       'CH' || 'COMPLETED' || 'DONE' || 'SUCCESS' => 'Проверен',
-      'PR' || 'PROCESSING' || 'PENDING' => 'Проверяется',
-      'UP' || 'UPLOADED' || 'SUBMITTED' => 'Загружен',
+      'PR' || 'PROCESSING' || 'PENDING' => 'Проверка',
+      'UP' || 'UPLOADED' || 'SUBMITTED' => 'Проверка',
       'FA' || 'FAILED' || 'ERROR' => 'Ошибка',
       'CANCELLED' || 'CANCELED' => 'Отменен',
       _ => 'В обработке',
@@ -113,6 +113,20 @@ class DashboardDocument {
       statusType == DocumentStatusType.success &&
       originalityPercent != null &&
       originalityPercent! < 60;
+
+  bool get canOpen => statusType == DocumentStatusType.success;
+
+  bool get isTerminal => const {
+        DocumentStatusType.success,
+        DocumentStatusType.error,
+        DocumentStatusType.cancelled,
+      }.contains(statusType);
+
+  String get unavailableReportLabel => switch (statusType) {
+        DocumentStatusType.error => 'Проверка завершилась с ошибкой',
+        DocumentStatusType.cancelled => 'Проверка отменена',
+        _ => 'Отчёт будет доступен после проверки',
+      };
 
   Color get statusColor {
     if (hasLowOriginality) return const Color(0xFFD93D45);

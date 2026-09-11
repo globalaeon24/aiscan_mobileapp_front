@@ -88,7 +88,17 @@ class DocumentCard extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    _RecommendationPill(document: document),
+                    if (document.canOpen)
+                      _RecommendationPill(document: document)
+                    else
+                      Text(
+                        document.unavailableReportLabel,
+                        style: const TextStyle(
+                          color: Color(0xFF8A94A6),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     const Spacer(),
                     Text(
                       document.dateLabel,

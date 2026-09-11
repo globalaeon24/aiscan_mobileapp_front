@@ -288,64 +288,64 @@ void _showDataSheet(
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => SafeArea(
-      top: false,
-      child: Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .72,
-        ),
-        padding: const EdgeInsets.fromLTRB(22, 10, 22, 22),
-        decoration: const BoxDecoration(
-          color: OySynAuthTokens.appBackground,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFC9D1E2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+    builder: (context) => Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .72,
+      ),
+      padding: EdgeInsets.fromLTRB(
+        22,
+        10,
+        22,
+        22 + oysynSystemBottomInset(context),
+      ),
+      decoration: const BoxDecoration(
+        color: OySynAuthTokens.appBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFC9D1E2),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 18),
-            Text(title, style: _Styles.cardTitle),
-            const SizedBox(height: 14),
-            Flexible(
-              child: rows.isEmpty
-                  ? Text(emptyText, style: _Styles.subtitle)
-                  : ListView(
-                      shrinkWrap: true,
-                      children: rows
-                          .map((row) => Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                        child:
-                                            Text(row.$1, style: _Styles.body)),
-                                    const SizedBox(width: 14),
-                                    Flexible(
-                                      child: Text(
-                                        row.$2,
-                                        textAlign: TextAlign.right,
-                                        style: _Styles.subtitle,
-                                      ),
+          ),
+          const SizedBox(height: 18),
+          Text(title, style: _Styles.cardTitle),
+          const SizedBox(height: 14),
+          Flexible(
+            child: rows.isEmpty
+                ? Text(emptyText, style: _Styles.subtitle)
+                : ListView(
+                    shrinkWrap: true,
+                    children: rows
+                        .map((row) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                      child: Text(row.$1, style: _Styles.body)),
+                                  const SizedBox(width: 14),
+                                  Flexible(
+                                    child: Text(
+                                      row.$2,
+                                      textAlign: TextAlign.right,
+                                      style: _Styles.subtitle,
                                     ),
-                                  ],
-                                ),
-                              ))
-                          .toList(),
-                    ),
-            ),
-          ],
-        ),
+                                  ),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                  ),
+          ),
+        ],
       ),
     ),
   );
