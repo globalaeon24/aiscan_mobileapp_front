@@ -41,6 +41,12 @@ void main() {
   testWidgets('login fits a compact Android viewport', (tester) async {
     await pumpCompact(tester, const LoginRegisterScreen());
     expect(find.text('Войти'), findsOneWidget);
+    expect(find.text('Продолжить с Google'), findsNothing);
+    expect(find.text('Зарегистрироваться'), findsNothing);
+    expect(
+      find.text('Для создания аккаунта обратитесь к администратору организации.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('PIN setup fits a compact Android viewport', (tester) async {

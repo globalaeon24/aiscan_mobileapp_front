@@ -155,40 +155,15 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
             loading: _loginLoading,
             onPressed: _tryLogin,
           ),
-          const SizedBox(height: 26),
-          const _OrDivider(),
-          const SizedBox(height: 24),
-          _GoogleAuthButton(
-            onPressed: () => _showError(
-              'Вход через Google пока не подключён для этой организации.',
-            ),
-          ),
           const SizedBox(height: 22),
-          Center(
-            child: Wrap(
-              alignment: WrapAlignment.center,
-              children: [
-                const Text(
-                  'Ещё нет аккаунта? ',
-                  style: TextStyle(
-                    color: Color(0xFF6A7590),
-                    fontSize: 13.5,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => _showError(
-                    'Новый аккаунт создаёт администратор организации.',
-                  ),
-                  child: const Text(
-                    'Зарегистрироваться',
-                    style: TextStyle(
-                      color: OySynAuthTokens.linkBlue,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
+          const Center(
+            child: Text(
+              'Для создания аккаунта обратитесь к администратору организации.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF6A7590),
+                fontSize: 13.5,
+              ),
             ),
           ),
         ],
@@ -379,90 +354,6 @@ class _PrimaryAuthButton extends StatelessWidget {
                 ),
         ),
       ),
-    );
-  }
-}
-
-class _GoogleAuthButton extends StatelessWidget {
-  final VoidCallback onPressed;
-
-  const _GoogleAuthButton({required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: OySynAuthTokens.buttonHeight,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: OySynAuthTokens.primaryBlue,
-          side: const BorderSide(
-            color: OySynAuthTokens.primaryBlue,
-            width: 1.8,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(OySynAuthTokens.buttonRadius),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'G',
-              style: TextStyle(
-                color: Color(0xFF4285F4),
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  'Продолжить с Google',
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: Color(0xFF3B475F),
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        Expanded(
-            child: Divider(color: OySynAuthTokens.divider, thickness: 1.2)),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 18),
-          child: Text(
-            'или',
-            style: TextStyle(
-              color: OySynAuthTokens.textMuted,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0,
-            ),
-          ),
-        ),
-        Expanded(
-            child: Divider(color: OySynAuthTokens.divider, thickness: 1.2)),
-      ],
     );
   }
 }
