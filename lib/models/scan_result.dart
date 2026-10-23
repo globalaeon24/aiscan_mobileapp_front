@@ -26,15 +26,20 @@ class ScanResult {
   final String? title;
   final String? status;
   final String? statusDisplay;
+  final bool isStale;
   final String? documentType;
 
   // 🔥 МЕТАДАННЫЕ
   final int? userScanIndex;
   final String? fileName;
   final String? authorName;
+  final String? department;
+  final int? fileSize;
+  final List<String> modules;
 
   // 🔥 ОСНОВНОЕ
-  final double aiPercentage;
+  final double originalityPercentage;
+  final double? aiPercentage;
   final String scannedText;
   final String? highlightedText;
   final DateTime createdAt;
@@ -44,7 +49,8 @@ class ScanResult {
 
   ScanResult({
     required this.id,
-    required this.aiPercentage,
+    required this.originalityPercentage,
+    this.aiPercentage,
     required this.scannedText,
     required this.highlightedText,
     required this.createdAt,
@@ -52,10 +58,14 @@ class ScanResult {
     this.title,
     this.status,
     this.statusDisplay,
+    this.isStale = false,
     this.documentType,
     this.userScanIndex,
     this.fileName,
     this.authorName,
+    this.department,
+    this.fileSize,
+    this.modules = const [],
   });
 
   factory ScanResult.fromJson(Map<String, dynamic> json) {
@@ -70,19 +80,26 @@ class ScanResult {
       title: json['title']?.toString(),
       status: json['status']?.toString(),
       statusDisplay: json['status_display']?.toString(),
+      isStale: json['is_stale'] == true,
       documentType: json['document_type_display']?.toString() ??
           json['document_type']?.toString(),
       userScanIndex: _asNullableInt(json['user_scan_index']),
       fileName: (json['file_name'] ?? json['document_name'] ?? json['title'])
           ?.toString(),
       authorName: (json['author_name'] ?? json['author'])?.toString(),
-      aiPercentage: _asDouble(
+      department: json['department']?.toString(),
+      fileSize: _asNullableInt(json['file_size']),
+      modules: (json['modules'] as List<dynamic>? ?? const [])
+          .map((value) => value.toString())
+          .toList(),
+      originalityPercentage: _asDouble(
+        json['originality_percentage'] ?? json['originality_percent'] ?? 0,
+      ),
+      aiPercentage: _asNullableDouble(
         json['ai_percentage'] ??
             json['ai_probability_percent'] ??
             json['ai_percent'] ??
-            json['originality_percentage'] ??
-            json['originality_percent'] ??
-            0,
+            json['chatgpt_generated_percentage'],
       ),
       scannedText:
           json['scanned_text'] ?? json['text'] ?? json['summary'] ?? "",
@@ -95,6 +112,34 @@ class ScanResult {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'status': status,
+        'status_display': statusDisplay,
+        'is_stale': isStale,
+        'document_type': documentType,
+        'user_scan_index': userScanIndex,
+        'file_name': fileName,
+        'author_name': authorName,
+        'department': department,
+        'file_size': fileSize,
+        'modules': modules,
+        'originality_percentage': originalityPercentage,
+        'ai_percentage': aiPercentage,
+        'scanned_text': scannedText,
+        'highlighted_text': highlightedText,
+        'created_at': createdAt.toIso8601String(),
+        'ai_fragments': aiFragments
+            .map((fragment) => {
+                  'start': fragment.start,
+                  'end': fragment.end,
+                  'text': fragment.text,
+                  'confidence': fragment.confidence,
+                })
+            .toList(),
+      };
 
   static int _asInt(dynamic value) {
     if (value is int) return value;
@@ -110,5 +155,10 @@ class ScanResult {
   static double _asDouble(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? 0.0;
+  }
+
+  static double? _asNullableDouble(dynamic value) {
+    if (value == null) return null;
+    return _asDouble(value);
   }
 }

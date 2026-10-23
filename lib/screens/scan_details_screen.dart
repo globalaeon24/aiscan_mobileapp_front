@@ -1,8 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:percent_indicator/circular_percent_indicator.dart';
+import 'dart:async';
+import 'dart:math' as math;
 
+import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
+
+import '../models/check_report.dart';
 import '../models/scan_result.dart';
 import '../services/scan_service.dart';
+import '../theme/app_theme.dart';
 
 class ScanDetailsScreen extends StatefulWidget {
   final ScanResult result;
@@ -19,243 +24,754 @@ class ScanDetailsScreen extends StatefulWidget {
 }
 
 class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
-  ScanResult? _fullResult;
-  bool _loading = false;
-  String? _error;
+  ScanResult? _detail;
+  CheckReport? _report;
+  bool _loading = true;
+  bool _sharing = false;
+  String? _reportMessage;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
-    if (widget.loadFromBackend || widget.result.scannedText.isEmpty) {
-      _loadDetail();
-    } else {
-      _fullResult = widget.result;
-    }
+    _load();
   }
 
-  Future<void> _loadDetail() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool showLoader = true}) async {
+    if (showLoader) setState(() => _loading = true);
+    ScanResult detail = widget.result;
+    CheckReport? report;
+    String? reportMessage;
 
     try {
-      final res = await ScanService.getScanById(widget.result.id);
-      setState(() {
-        _fullResult = res;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _loading = false;
-        _error = e.toString();
-      });
+      if (widget.loadFromBackend || widget.result.status != 'CH') {
+        detail = await ScanService.getScanById(widget.result.id);
+      }
+    } catch (error) {
+      reportMessage = 'Не удалось обновить данные проверки: $error';
+    }
+
+    if (_isCompleted(detail.status)) {
+      try {
+        report = await ScanService.getReport(widget.result.id);
+      } catch (_) {
+        reportMessage ??= 'Отчёт формируется. Обновите страницу немного позже.';
+      }
+    } else if (_isFailed(detail.status)) {
+      reportMessage ??= 'Core не смог завершить проверку документа.';
+    } else {
+      reportMessage ??=
+          'Проверка выполняется. Результаты обновятся автоматически.';
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _detail = detail;
+      _report = report;
+      _reportMessage = reportMessage;
+      _loading = false;
+    });
+    _schedulePolling(detail.status);
+  }
+
+  void _schedulePolling(String? status) {
+    _pollTimer?.cancel();
+    if (_isCompleted(status) || _isFailed(status)) return;
+    _pollTimer = Timer(
+      const Duration(seconds: 5),
+      () => _load(showLoader: false),
+    );
+  }
+
+  Future<void> _sharePdf(String type, String fileName) async {
+    setState(() => _sharing = true);
+    try {
+      final bytes = await ScanService.getReportPdf(
+        widget.result.id,
+        reportType: type,
+      );
+      await Printing.sharePdf(bytes: bytes, filename: fileName);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось получить отчёт: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final data = _fullResult ?? widget.result;
-
-    // ✅ СТРОГО double
-    final double aiPercent = data.aiPercentage.toDouble().clamp(0.0, 100.0);
-    final double humanPercent = (100.0 - aiPercent).clamp(0.0, 100.0);
-    final double progress = (aiPercent / 100.0).clamp(0.0, 1.0);
-
-    final date = data.createdAt;
-    final dateStr =
-        "${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}";
-    final timeStr =
-        "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
-
-    final scanIndex = data.userScanIndex ?? data.id;
+    final detail = _detail ?? widget.result;
+    final report = _report;
+    final activeSources =
+        report?.sources.where((item) => item.active).toList() ?? const [];
+    final date = detail.createdAt;
+    final subtitle = [
+      detail.documentType,
+      '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}',
+    ].whereType<String>().join(' · ');
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Результат проверки")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      backgroundColor: OySynAuthTokens.appBackground,
+      appBar: AppBar(
+        toolbarHeight: 62,
+        leadingWidth: 58,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 18, top: 7, bottom: 7),
+          child: IconButton(
+            onPressed: Navigator.of(context).pop,
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              side: const BorderSide(color: OySynAuthTokens.divider),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(11),
+              ),
+            ),
+          ),
+        ),
+        titleSpacing: 11,
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // =================== ЗАГОЛОВОК ===================
+            const Text(
+              'Отчёт',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
             Text(
-              "Проверка №$scanIndex",
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              '${detail.title ?? detail.fileName ?? 'Документ'} · $subtitle',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF8A94A6),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w400,
+              ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              "$dateStr · $timeStr",
-              style: Theme.of(context).textTheme.bodySmall,
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: _loading ? null : _load,
+            tooltip: 'Обновить отчёт',
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 6, 18, 24),
+          children: [
+            if (_loading) const LinearProgressIndicator(minHeight: 2),
+            _MetricsCard(detail: detail, report: report),
+            if (_reportMessage != null) ...[
+              const SizedBox(height: 12),
+              _InfoBanner(message: _reportMessage!),
+            ],
+            if (report != null && report.fraud.isNotEmpty) ...[
+              const SizedBox(height: 13),
+              _FraudBanner(items: report.fraud),
+            ],
+            const SizedBox(height: 13),
+            _SourcesHeader(
+              count: activeSources.length,
             ),
-
-            if (data.fileName != null) Text("Файл: ${data.fileName}"),
-            if (data.authorName != null) Text("Автор: ${data.authorName}"),
-
-            const SizedBox(height: 20),
-
-            // =================== ИНДИКАТОР + ПОЯСНЕНИЯ ===================
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                CircularPercentIndicator(
-                  radius: 52,
-                  lineWidth: 10,
-                  percent: progress,
-                  animation: true,
-                  center: Text(
-                    "${aiPercent.toStringAsFixed(1)}%",
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  progressColor: aiPercent >= 50.0 ? Colors.red : Colors.green,
-                  backgroundColor: Colors.grey.shade300,
-                ),
-
-                const SizedBox(width: 16),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _PercentRow(
-                        label: "Вероятно ИИ",
-                        value: aiPercent,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(height: 6),
-                      _PercentRow(
-                        label: "Вероятно человек",
-                        value: humanPercent,
-                        color: Colors.green,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        aiPercent >= 50.0
-                            ? "Текст по стилю и структуре ближе к генерации ИИ."
-                            : "Текст по стилю и структуре ближе к человеческому написанию.",
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // =================== ТЕКСТ ===================
-            Text(
-              "Распознанный текст:",
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 10),
-
-            Expanded(child: _buildHighlightedText(context, data)),
+            const SizedBox(height: 13),
+            if (activeSources.isNotEmpty)
+              for (final source in activeSources) ...[
+                _ReportSourceCard(source: source),
+                const SizedBox(height: 10),
+              ]
+            else if (!_loading)
+              const _InfoBanner(message: 'Источники совпадений не обнаружены.'),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildHighlightedText(BuildContext context, ScanResult data) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Text(
-          "Ошибка загрузки:\n$_error",
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Theme.of(context).colorScheme.error),
-        ),
-      );
-    }
-
-    if (data.scannedText.isEmpty) {
-      return const Center(child: Text("Текст проверки отсутствует."));
-    }
-
-    final spans = <TextSpan>[];
-    int cursor = 0;
-
-    for (final f in data.aiFragments) {
-      if (f.start > cursor) {
-        spans.add(TextSpan(
-          text: data.scannedText.substring(cursor, f.start),
-        ));
-      }
-
-      spans.add(
-        TextSpan(
-          text: data.scannedText.substring(f.start, f.end),
-          style: TextStyle(
-            backgroundColor: Colors.red.withOpacity(0.25),
-            fontWeight: FontWeight.bold,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 4),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: OySynAuthTokens.divider)),
           ),
-        ),
-      );
-
-      cursor = f.end;
-    }
-
-    if (cursor < data.scannedText.length) {
-      spans.add(TextSpan(
-        text: data.scannedText.substring(cursor),
-      ));
-    }
-
-    return SingleChildScrollView(
-      child: RichText(
-        text: TextSpan(
-          style: Theme.of(context).textTheme.bodyLarge,
-          children: spans,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton.icon(
+                  onPressed: _sharing
+                      ? null
+                      : () => _sharePdf(
+                            'certificate',
+                            'oysyn-certificate-${detail.id}.pdf',
+                          ),
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Скачать справку о проверке'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: _sharing
+                      ? null
+                      : () => _sharePdf(
+                            'full_report',
+                            'oysyn-report-${detail.id}.pdf',
+                          ),
+                  icon: const Icon(Icons.description_outlined),
+                  label: const Text('Скачать полный отчёт'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: OySynAuthTokens.primaryBlue,
+                    side: const BorderSide(color: Color(0xFFCBD9FB)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _PercentRow extends StatelessWidget {
-  final String label;
-  final double value;
-  final Color color;
+class _MetricsCard extends StatelessWidget {
+  final ScanResult detail;
+  final CheckReport? report;
 
-  const _PercentRow({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
+  const _MetricsCard({required this.detail, required this.report});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium,
+    final originality = report?.originality ?? detail.originalityPercentage;
+    final plagiarism = report?.plagiarism ?? 0;
+    final citation = report?.citation ?? 0;
+    final selfCitation = report?.selfCitation ?? 0;
+    final aiGenerated = report?.aiGenerated ?? detail.aiPercentage ?? 0;
+    final reportedHuman = report?.humanWritten;
+    final humanWritten =
+        reportedHuman != null && reportedHuman + aiGenerated > 0
+            ? reportedHuman
+            : (100 - aiGenerated).clamp(0, 100);
+    const originalityColor = Color(0xFF22A45D);
+    const plagiarismColor = Color(0xFFE75555);
+    const citationColor = Color(0xFF71809E);
+    const selfCitationColor = Color(0xFFF0A22E);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _reportCardDecoration(),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              SizedBox.square(
+                dimension: 118,
+                child: CustomPaint(
+                  painter: _SegmentedReportRingPainter(
+                    segments: [
+                      (originality, originalityColor),
+                      (plagiarism, plagiarismColor),
+                      (citation, citationColor),
+                      (selfCitation, selfCitationColor),
+                    ],
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${originality.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            color: Color(0xFF148A4E),
+                            fontSize: 26,
+                            height: 1,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'оригинальность',
+                          style: TextStyle(
+                            color: Color(0xFF8A94A6),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  children: [
+                    _MetricRow(
+                      label: 'Оригинальность',
+                      value: originality,
+                      color: originalityColor,
+                    ),
+                    _MetricRow(
+                      label: 'Совпадения',
+                      value: plagiarism,
+                      color: plagiarismColor,
+                    ),
+                    _MetricRow(
+                      label: 'Цитирования',
+                      value: citation,
+                      color: citationColor,
+                    ),
+                    _MetricRow(
+                      label: 'Самоцитирования',
+                      value: selfCitation,
+                      color: selfCitationColor,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ),
-        Text(
-          "${value.toStringAsFixed(1)}%",
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: color,
+          const Divider(height: 22),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'ИИ-контент',
+                  style: TextStyle(color: Color(0xFF46506A), fontSize: 12.5),
+                ),
+              ),
+              Text(
+                '${aiGenerated.toStringAsFixed(2)}%',
+                style: const TextStyle(
+                  color: Color(0xFF6D4EF0),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              height: 9,
+              child: Row(
+                children: [
+                  if (aiGenerated > 0)
+                    Expanded(
+                      flex: math.max(1, (aiGenerated * 10).round()),
+                      child: const ColoredBox(color: Color(0xFF7454F5)),
+                    ),
+                  if (humanWritten > 0)
+                    Expanded(
+                      flex: math.max(1, (humanWritten * 10).round()),
+                      child: const ColoredBox(color: Color(0xFFDDE4F3)),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              const _LegendDot(color: Color(0xFF7454F5)),
+              const SizedBox(width: 5),
+              const Text('ИИ',
+                  style: TextStyle(color: Color(0xFF6D4EF0), fontSize: 11.5)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    const _LegendDot(color: Color(0xFFDDE4F3)),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        'Текст человека ${humanWritten.toStringAsFixed(2)}%',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                            color: Color(0xFF71809E), fontSize: 11.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
+
+class _SegmentedReportRingPainter extends CustomPainter {
+  final List<(double, Color)> segments;
+
+  const _SegmentedReportRingPainter({required this.segments});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const width = 11.0;
+    final rect = Offset.zero & size;
+    final arcRect = rect.deflate(width / 2);
+    final background = Paint()
+      ..color = const Color(0xFFEEF1F6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width;
+    canvas.drawArc(arcRect, -math.pi / 2, math.pi * 2, false, background);
+
+    var start = -math.pi / 2;
+    for (final segment in segments) {
+      final value = segment.$1.clamp(0, 100);
+      if (value <= 0) continue;
+      final sweep = math.pi * 2 * value / 100;
+      final paint = Paint()
+        ..color = segment.$2
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.butt;
+      canvas.drawArc(arcRect, start, sweep, false, paint);
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SegmentedReportRingPainter oldDelegate) =>
+      oldDelegate.segments != segments;
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  const _LegendDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      );
+}
+
+class _MetricRow extends StatelessWidget {
+  final String label;
+  final double? value;
+  final Color color;
+
+  const _MetricRow(
+      {required this.label,
+      required this.value,
+      this.color = const Color(0xFF6A7590)});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          _LegendDot(color: color),
+          const SizedBox(width: 7),
+          Expanded(
+              child: Text(label,
+                  style: const TextStyle(
+                      color: Color(0xFF46506A), fontSize: 12.5))),
+          Text(value == null ? '—' : '${value!.toStringAsFixed(2)}%',
+              style: TextStyle(
+                  color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  final String message;
+
+  const _InfoBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCF1DE),
+        border: Border.all(color: const Color(0xFFF6E3C0)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded,
+              color: Color(0xFFC67F09), size: 19),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(message,
+                  style: const TextStyle(
+                      color: Color(0xFF8A6414), fontSize: 12.5))),
+        ],
+      ),
+    );
+  }
+}
+
+class _SourcesHeader extends StatelessWidget {
+  final int count;
+
+  const _SourcesHeader({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: OySynAuthTokens.divider),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF0FF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.link_rounded,
+              color: OySynAuthTokens.primaryBlue,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 11),
+          const Expanded(
+            child: Text(
+              'Источники совпадений',
+              style: TextStyle(
+                color: OySynAuthTokens.textDark,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Container(
+            constraints: const BoxConstraints(minWidth: 34),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF0FF),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                color: OySynAuthTokens.primaryBlue,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FraudBanner extends StatelessWidget {
+  final List<ReportFraud> items;
+
+  const _FraudBanner({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCF1DE),
+        border: Border.all(color: const Color(0xFFF1D69D)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: Color(0xFFC67F09), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Подозрительная активность: ${items.map((item) => item.label.toLowerCase()).join(', ')}',
+              style: const TextStyle(color: Color(0xFF8A6414), fontSize: 12.5),
+            ),
+          ),
+          Text('${items.fold<int>(0, (sum, item) => sum + item.count)}',
+              style: const TextStyle(
+                  color: Color(0xFFC67F09),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReportSourceCard extends StatelessWidget {
+  final ReportSource source;
+
+  const _ReportSourceCard({required this.source});
+
+  @override
+  Widget build(BuildContext context) {
+    final host = source.url == null ? null : Uri.tryParse(source.url!)?.host;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: _reportCardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _SourceBadge(
+                  text: '${source.moduleLabel} · #${source.id}',
+                  color: const Color(0xFF5A6577),
+                  background: const Color(0xFFEEF1F7)),
+              const _SourceBadge(
+                  text: 'Совпадение',
+                  color: Color(0xFFD23B41),
+                  background: Color(0xFFFCEAEA)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(source.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: host == null
+                      ? const Color(0xFF12203E)
+                      : const Color(0xFF2B5CE0),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700)),
+          if (host != null && host.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(host,
+                style:
+                    const TextStyle(color: Color(0xFF8A94A6), fontSize: 11.5)),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _SourceMetric(
+                  value: source.scoreReport,
+                  label: 'доля',
+                  color: const Color(0xFFD23B41)),
+              const SizedBox(width: 18),
+              _SourceMetric(
+                  value: source.scoreSource,
+                  label: 'поиск',
+                  color: const Color(0xFF12203E)),
+              const Spacer(),
+              TextButton(
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text(
+                            'Исключение источников доступно в полном веб-отчёте.'))),
+                style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFFF3F5FA),
+                    foregroundColor: const Color(0xFF5A6577)),
+                child: const Text('Исключить'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SourceBadge extends StatelessWidget {
+  final String text;
+  final Color color;
+  final Color background;
+
+  const _SourceBadge(
+      {required this.text, required this.color, required this.background});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+            color: background, borderRadius: BorderRadius.circular(6)),
+        child: Text(text,
+            style: TextStyle(
+                color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+      );
+}
+
+class _SourceMetric extends StatelessWidget {
+  final double value;
+  final String label;
+  final Color color;
+
+  const _SourceMetric(
+      {required this.value, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) => RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+                text: '${value.toStringAsFixed(2)}% ',
+                style: TextStyle(
+                    color: color, fontSize: 15, fontWeight: FontWeight.w800)),
+            TextSpan(
+                text: label,
+                style: const TextStyle(
+                    color: Color(0xFF8A94A6),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+}
+
+BoxDecoration _reportCardDecoration() => BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: OySynAuthTokens.divider),
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF142350).withValues(alpha: 0.05),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    );
+
+bool _isCompleted(String? status) => const {
+      'CH',
+      'COMPLETED',
+      'DONE',
+      'SUCCESS',
+    }.contains(status?.trim().toUpperCase());
+
+bool _isFailed(String? status) => const {
+      'FA',
+      'FAILED',
+      'ERROR',
+      'CANCELLED',
+      'CANCELED',
+    }.contains(status?.trim().toUpperCase());

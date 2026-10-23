@@ -19,29 +19,59 @@ class PinCodeInput extends StatefulWidget {
   State<PinCodeInput> createState() => PinCodeInputState();
 }
 
-class PinCodeInputState extends State<PinCodeInput> {
+class PinCodeInputState extends State<PinCodeInput>
+    with WidgetsBindingObserver {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
+      if (mounted) _activateInput();
     });
   }
 
   @override
+  void didUpdateWidget(covariant PinCodeInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.enabled && widget.enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _activateInput());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _activateInput());
+    }
+  }
+
   void clear() {
     _controller.clear();
     setState(() {});
+    _activateInput();
+  }
+
+  void requestKeyboard() => _activateInput();
+
+  void _activateInput() {
+    if (!mounted || !widget.enabled) return;
     _focusNode.requestFocus();
+    Future<void>.delayed(const Duration(milliseconds: 180), () {
+      if (mounted && widget.enabled) {
+        SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+      }
+    });
   }
 
   void _onChanged(String value) {
@@ -65,27 +95,42 @@ class PinCodeInputState extends State<PinCodeInput> {
     return Column(
       children: [
         GestureDetector(
-          onTap: widget.enabled ? _focusNode.requestFocus : null,
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.enabled ? _activateInput : null,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              Opacity(
-                opacity: 0,
-                child: SizedBox(
-                  width: 1,
-                  height: 1,
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    enabled: widget.enabled,
-                    keyboardType: TextInputType.number,
-                    maxLength: 4,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(4),
-                    ],
-                    onChanged: _onChanged,
-                    decoration: const InputDecoration(counterText: ''),
+              Positioned.fill(
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  enabled: widget.enabled,
+                  autofocus: true,
+                  showCursor: false,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  enableInteractiveSelection: false,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  maxLength: 4,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(4),
+                  ],
+                  onChanged: _onChanged,
+                  onTap: _activateInput,
+                  style: const TextStyle(
+                    color: Colors.transparent,
+                    fontSize: 1,
+                  ),
+                  cursorColor: Colors.transparent,
+                  decoration: const InputDecoration(
+                    counterText: '',
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    contentPadding: EdgeInsets.zero,
                   ),
                 ),
               ),

@@ -184,21 +184,19 @@ class _AuthTabsScreenState extends State<AuthTabsScreen>
                     }
 
                     setState(() => loading = true);
-                    final ok = await AuthService.register(
+                    final result = await AuthService.register(
                       emailRegCtrl.text,
                       passRegCtrl.text,
-                      "Пользователь",
-                      "",
+                      passReg2Ctrl.text,
                     );
                     if (!context.mounted) return;
                     setState(() => loading = false);
 
-                    if (ok) {
-                      Navigator.pushReplacementNamed(
-                          context, "/security-setup");
+                    if (result.code == RegistrationCode.created) {
+                      Navigator.pop(context);
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Ошибка регистрации")),
+                        SnackBar(content: Text(result.message)),
                       );
                     }
                   },

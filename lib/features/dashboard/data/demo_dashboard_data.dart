@@ -13,8 +13,8 @@ class DemoDashboardData {
     DashboardDocument(
       title: 'Курсовая',
       subtitle: 'Ерлан Б.',
-      originalityPercent: 75,
-      aiPercent: 5,
+      originalityPercent: 75.0,
+      aiPercent: 5.0,
       statusType: DocumentStatusType.success,
     ),
     DashboardDocument(
@@ -32,7 +32,7 @@ class DemoDashboardData {
     DashboardDocument(
       title: 'Курсовая работа.docx',
       subtitle: 'Аужатов И. · 14.05',
-      originalityPercent: 75,
+      originalityPercent: 75.0,
       statusType: DocumentStatusType.success,
     ),
   ];

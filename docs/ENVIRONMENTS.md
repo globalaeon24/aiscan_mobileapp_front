@@ -1,8 +1,8 @@
 # Oysyn Mobile environments
 
 The Flutter application receives its environment and API address at build time.
-The default remains Production so existing release commands keep their current
-behavior.
+The default is Stage so development and test builds cannot contact Production
+unless Production is selected explicitly.
 
 ## VS Code
 
@@ -34,3 +34,16 @@ credentials, and Core API credentials must never be included in a Flutter build.
 
 Android product flavors and iOS schemes will wrap these values after the Stage
 backend domain and the iOS Production bundle identifier are confirmed.
+
+## Archiving Stage from Xcode
+
+The iOS project defaults to Stage, so a tester archive can be created directly
+from `ios/Runner.xcworkspace` without command-line build flags:
+
+1. Select the `Runner` scheme and `Any iOS Device (arm64)`.
+2. Choose **Product > Archive**.
+3. In Organizer, choose **Distribute App > TestFlight & App Store**.
+
+Code signing for CocoaPods frameworks is serialized to avoid repeated Keychain
+permission prompts. If macOS asks once for access to the Apple signing key,
+choose **Always Allow**.

@@ -4,13 +4,22 @@ import '../../../services/profile_service.dart';
 import '../../../services/scan_service.dart';
 import '../../../storage/token_storage.dart';
 import '../../../theme/app_theme.dart';
+import '../../../models/scan_result.dart';
+import '../../../screens/scan_details_screen.dart';
 import '../../dashboard/models/dashboard_document.dart';
 import '../../dashboard/widgets/dashboard_header.dart';
 import '../../dashboard/widgets/document_card.dart';
 import '../../dashboard/widgets/month_summary_card.dart';
 
 class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  final VoidCallback onCheck;
+  final VoidCallback onDocuments;
+
+  const DashboardPage({
+    super.key,
+    required this.onCheck,
+    required this.onDocuments,
+  });
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -26,7 +35,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<_DashboardData> _load() async {
-    final results = await ScanService.getHistory();
+    var results = await TokenStorage.getHistory();
+    int? totalDocuments;
+    try {
+      final history = await ScanService.getHistoryPage(page: 1, pageSize: 100);
+      results = history.items;
+      totalDocuments = history.total;
+      await TokenStorage.saveHistory(results);
+    } catch (_) {}
     final user = await _loadUser();
     final docs = results.map(DashboardDocument.fromScanResult).toList();
     final completed = docs
@@ -42,10 +58,27 @@ class _DashboardPageState extends State<DashboardPage> {
 
     return _DashboardData(
       user: user,
+      results: results,
       documents: docs,
-      totalDocuments: docs.length,
+      totalDocuments: totalDocuments ?? docs.length,
       averageOriginality: avg,
-      checksAvailable: _asInt(user?['checks_available']),
+      checksAvailable: _asNullableInt(user?['checks_available']),
+      monthlyDocuments: results.where(_isCurrentMonth).length,
+    );
+  }
+
+  static bool _isCurrentMonth(ScanResult result) {
+    final now = DateTime.now();
+    return result.createdAt.year == now.year &&
+        result.createdAt.month == now.month;
+  }
+
+  void _openResult(BuildContext context, ScanResult result) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            ScanDetailsScreen(result: result, loadFromBackend: true),
+      ),
     );
   }
 
@@ -69,107 +102,269 @@ class _DashboardPageState extends State<DashboardPage> {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  static int? _asNullableInt(dynamic value) =>
+      value == null ? null : _asInt(value);
+
+  static int? _organizationId(Map<String, dynamic>? user) {
+    final value = user?['organization_id'] ?? user?['core_organization_id'];
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<_DashboardData>(
-      future: _future,
-      builder: (context, snapshot) {
-        final data = snapshot.data;
+    return ValueListenableBuilder<Map<String, dynamic>?>(
+      valueListenable: TokenStorage.userListenable,
+      builder: (context, currentUser, _) => FutureBuilder<_DashboardData>(
+        future: _future,
+        builder: (context, snapshot) {
+          final data = snapshot.data;
+          final user = currentUser ?? data?.user;
+          final checksAvailable = _asNullableInt(user?['checks_available']);
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            setState(() => _future = _load());
-            await _future;
-          },
-          child: CustomScrollView(
-            slivers: [
-              const SliverToBoxAdapter(child: DashboardHeader()),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-                sliver: SliverList.list(
-                  children: [
-                    Text.rich(
-                      TextSpan(
-                        text: 'Привет, ',
+          return RefreshIndicator(
+            onRefresh: () async {
+              setState(() {
+                _future = _load();
+              });
+              await _future;
+            },
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: DashboardHeader(
+                    checksAvailable: checksAvailable,
+                    isOrganizationUser: _organizationId(user) != null,
+                    recentResults: data?.results ?? const [],
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
+                  sliver: SliverList.list(
+                    children: [
+                      Text(
+                        'Привет, ${TokenStorage.displayName(user)}',
+                        style: OySynTextStyles.welcomeTitle,
+                      ),
+                      const SizedBox(height: 14),
+                      _UploadAction(
+                        onTap: widget.onCheck,
+                        enabled: checksAvailable == null || checksAvailable > 0,
+                      ),
+                      const SizedBox(height: 14),
+                      if (data != null && data.totalDocuments > 0)
+                        MonthSummaryCard(
+                          totalDocuments: data.totalDocuments,
+                          averageOriginality: data.averageOriginality,
+                          monthlyDocuments: data.monthlyDocuments,
+                        )
+                      else
+                        const _NewUserGuide(),
+                      const SizedBox(height: 16),
+                      Row(
                         children: [
-                          TextSpan(
-                            text: TokenStorage.displayName(data?.user),
-                            style: const TextStyle(
-                              color: OySynAuthTokens.primaryBlue,
+                          Expanded(
+                            child: Text(
+                              'Последние проверки',
+                              style: OySynTextStyles.recentDocumentsTitle,
                             ),
                           ),
+                          TextButton(
+                            onPressed: widget.onDocuments,
+                            child: const Text('Все'),
+                          ),
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting)
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
                         ],
                       ),
-                      style: OySynTextStyles.welcomeTitle,
-                    ),
-                    const SizedBox(height: 20),
-                    MonthSummaryCard(
-                      totalDocuments: data?.totalDocuments ?? 0,
-                      averageOriginality: data?.averageOriginality ?? 0,
-                      checksAvailable: data?.checksAvailable ?? 0,
-                    ),
-                    const SizedBox(height: 30),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Последние документы',
-                            style: OySynTextStyles.recentDocumentsTitle,
-                          ),
-                        ),
-                        if (snapshot.connectionState == ConnectionState.waiting)
-                          const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    if (snapshot.hasError)
-                      _DashboardMessage(
-                        icon: Icons.wifi_off_rounded,
-                        text: 'Не удалось загрузить документы',
-                        detail: snapshot.error.toString(),
-                      )
-                    else if (data != null && data.documents.isEmpty)
-                      const _DashboardMessage(
-                        icon: Icons.description_outlined,
-                        text: 'Документов пока нет',
-                        detail: 'Загрузи первый документ для проверки',
-                      )
-                    else
-                      for (final document
-                          in (data?.documents ?? const <DashboardDocument>[])
-                              .take(5)) ...[
-                        DocumentCard(document: document),
-                        const SizedBox(height: 12),
-                      ],
-                  ],
+                      const SizedBox(height: 6),
+                      if (snapshot.hasError)
+                        _DashboardMessage(
+                          icon: Icons.wifi_off_rounded,
+                          text: 'Не удалось загрузить документы',
+                          detail: snapshot.error.toString(),
+                        )
+                      else if (data != null && data.documents.isEmpty)
+                        const _DashboardMessage(
+                          icon: Icons.description_outlined,
+                          text: 'Документов пока нет',
+                          detail: 'Загрузи первый документ для проверки',
+                        )
+                      else
+                        for (final result
+                            in (data?.results ?? const <ScanResult>[])
+                                .take(6)) ...[
+                          Builder(builder: (context) {
+                            final document =
+                                DashboardDocument.fromScanResult(result);
+                            return DocumentCard(
+                              document: document,
+                              onTap: document.canOpen
+                                  ? () => _openResult(context, result)
+                                  : null,
+                            );
+                          }),
+                          const SizedBox(height: 10),
+                        ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
 
 class _DashboardData {
   final Map<String, dynamic>? user;
+  final List<ScanResult> results;
   final List<DashboardDocument> documents;
   final int totalDocuments;
   final int averageOriginality;
-  final int checksAvailable;
+  final int? checksAvailable;
+  final int monthlyDocuments;
 
   const _DashboardData({
     required this.user,
+    required this.results,
     required this.documents,
     required this.totalDocuments,
     required this.averageOriginality,
     required this.checksAvailable,
+    required this.monthlyDocuments,
   });
+}
+
+class _NewUserGuide extends StatelessWidget {
+  const _NewUserGuide();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: OySynAuthTokens.divider),
+        ),
+        child: const Row(
+          children: [
+            Icon(
+              Icons.auto_awesome_outlined,
+              color: OySynAuthTokens.primaryBlue,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Начните с первой проверки',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'Выберите документ, настройте параметры и получите подробный отчёт.',
+                    style: TextStyle(
+                      color: OySynAuthTokens.textMuted,
+                      fontSize: 12.5,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _UploadAction extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool enabled;
+
+  const _UploadAction({required this.onTap, required this.enabled});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: enabled ? Colors.white : const Color(0xFFF5F6FA),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color:
+                  enabled ? const Color(0xFFBFD0F5) : OySynAuthTokens.divider,
+              width: 2,
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: enabled ? null : const Color(0xFFD8DEEA),
+                  gradient: enabled
+                      ? const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF3E7BFF), Color(0xFF2F5FE0)],
+                        )
+                      : null,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (enabled
+                              ? OySynAuthTokens.primaryBlue
+                              : Colors.transparent)
+                          .withValues(alpha: 0.28),
+                      blurRadius: 18,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.file_upload_outlined,
+                    color: Colors.white, size: 27),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                enabled ? 'Проверить документ' : 'Лимит проверок исчерпан',
+                style: TextStyle(
+                  color: enabled
+                      ? OySynAuthTokens.textDark
+                      : OySynAuthTokens.textMuted,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                enabled
+                    ? 'Перетащите или выберите файл · PDF, DOCX, TXT'
+                    : 'Обратитесь к администратору организации',
+                style:
+                    const TextStyle(color: Color(0xFF8A94A6), fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _DashboardMessage extends StatelessWidget {

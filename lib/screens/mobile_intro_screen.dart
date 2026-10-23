@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/oysyn_logo.dart';
 
 class MobileIntroScreen extends StatefulWidget {
   const MobileIntroScreen({super.key});
@@ -22,7 +23,9 @@ class _MobileIntroScreenState extends State<MobileIntroScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1100),
     );
-    _scale = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _scale = Tween<double>(begin: 0.58, end: 1.18).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
     _start();
   }
@@ -60,17 +63,17 @@ class _MobileIntroScreenState extends State<MobileIntroScreen>
           child: FadeTransition(
             opacity: _fade,
             child: ScaleTransition(
-              scale: Tween<double>(begin: 0.92, end: 1).animate(_scale),
+              scale: _scale,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 88,
-                    height: 88,
-                    padding: const EdgeInsets.all(14),
+                    width: 108,
+                    height: 108,
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(26),
+                      borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.16),
@@ -79,7 +82,7 @@ class _MobileIntroScreenState extends State<MobileIntroScreen>
                         ),
                       ],
                     ),
-                    child: Image.asset(OySynAuthTokens.logoAsset),
+                    child: const OySynLogo(size: 76),
                   ),
                   const SizedBox(height: 22),
                   const Text(

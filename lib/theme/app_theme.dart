@@ -1,27 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class OySynAuthTokens {
   const OySynAuthTokens._();
 
   static const String logoAsset = 'assets/icons/oysyn_logo.png';
 
-  static const Color primaryBlue = Color(0xFF3F73F6);
-  static const Color deepBlue = Color(0xFF1F4FD8);
-  static const Color linkBlue = Color(0xFF2F6BFF);
-  static const Color textDark = Color(0xFF111827);
-  static const Color textMuted = Color(0xFF64748B);
-  static const Color iconGrey = Color(0xFF737D84);
-  static const Color fieldBorder = Color(0xFFD2DFFF);
-  static const Color divider = Color(0xFFE2E8F0);
+  static const Color primaryBlue = Color(0xFF3972FE);
+  static const Color deepBlue = Color(0xFF2F5FE0);
+  static const Color linkBlue = Color(0xFF3972FE);
+  static const Color textDark = Color(0xFF12203E);
+  static const Color textMuted = Color(0xFF8A94A6);
+  static const Color iconGrey = Color(0xFF9AA4B8);
+  static const Color fieldBorder = Color(0xFFE7ECF5);
+  static const Color divider = Color(0xFFE7ECF5);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color topWash = Color(0xFFEAF0FF);
   static const Color shadowBlue = Color(0x333F73F6);
-  static const Color appBackground = Color(0xFFF0F5FF);
+  static const Color appBackground = Color(0xFFF1F5FD);
   static const Color appBackgroundWarm = Color(0xFFFBFDFF);
 
   static const double contentMaxWidth = 390;
-  static const double screenHorizontalPadding = 24;
+  static const double screenHorizontalPadding = 20;
   static const double fieldHeight = 56;
   static const double fieldRadius = 12;
   static const double buttonHeight = 56;
@@ -32,37 +31,69 @@ class OySynAuthTokens {
 class OySynTextStyles {
   const OySynTextStyles._();
 
-  static TextStyle get welcomeTitle => GoogleFonts.dmSans(
-        color: OySynAuthTokens.textDark,
-        fontSize: 26,
-        height: 1.12,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-      );
+  static const TextStyle welcomeTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 22,
+    height: 1.12,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0,
+  );
 
-  static TextStyle get sectionTitle => GoogleFonts.dmSans(
-        color: OySynAuthTokens.textDark,
-        fontSize: 24,
-        height: 31 / 24,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-      );
+  static const TextStyle sectionTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 22,
+    height: 28 / 22,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0,
+  );
 
-  static TextStyle get recentDocumentsTitle => GoogleFonts.dmSans(
-        color: OySynAuthTokens.textDark,
-        fontSize: 18,
-        height: 24 / 18,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-      );
+  static const TextStyle pageTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 24,
+    height: 30 / 24,
+    fontWeight: FontWeight.w800,
+    letterSpacing: 0,
+  );
 
-  static TextStyle get authLogo => GoogleFonts.dmSans(
-        color: OySynAuthTokens.primaryBlue,
-        fontSize: 30,
-        height: 1,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0,
-      );
+  static const TextStyle cardTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 16,
+    height: 21 / 16,
+    fontWeight: FontWeight.w800,
+    letterSpacing: 0,
+  );
+
+  static const TextStyle body = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0,
+  );
+
+  static const TextStyle caption = TextStyle(
+    color: OySynAuthTokens.textMuted,
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0,
+  );
+
+  static const TextStyle recentDocumentsTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 15,
+    height: 20 / 15,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0,
+  );
+
+  static const TextStyle authLogo = TextStyle(
+    color: OySynAuthTokens.primaryBlue,
+    fontSize: 30,
+    height: 1,
+    fontWeight: FontWeight.w800,
+    letterSpacing: 0,
+  );
 }
 
 ThemeData buildAppTheme() {
@@ -76,7 +107,7 @@ ThemeData buildAppTheme() {
     ),
   );
 
-  final textTheme = GoogleFonts.manropeTextTheme(base.textTheme).apply(
+  final textTheme = base.textTheme.apply(
     bodyColor: OySynAuthTokens.textDark,
     displayColor: OySynAuthTokens.textDark,
   );
@@ -162,6 +193,49 @@ ThemeData buildAppTheme() {
     bottomAppBarTheme: base.bottomAppBarTheme.copyWith(
       color: Colors.white,
       elevation: 8,
+    ),
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      modalBackgroundColor: Colors.transparent,
+      modalBarrierColor: Color(0x660F172A),
+      showDragHandle: false,
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      titleTextStyle: const TextStyle(
+        color: OySynAuthTokens.textDark,
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+      ),
+      contentTextStyle: const TextStyle(
+        color: OySynAuthTokens.textMuted,
+        fontSize: 14,
+        height: 1.4,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: Colors.white,
+      surfaceTintColor: Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      textStyle: const TextStyle(
+        color: OySynAuthTokens.textDark,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: OySynAuthTokens.textDark,
+      contentTextStyle: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
   );
 }
