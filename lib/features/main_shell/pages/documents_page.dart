@@ -12,6 +12,7 @@ import '../../dashboard/models/dashboard_document.dart';
 import '../../dashboard/widgets/document_card.dart';
 import '../utils/document_list_filter.dart';
 import 'deleted_documents_page.dart';
+import 'pair_checks_panel.dart';
 
 enum _PeriodFilter {
   all('Все', null),
@@ -48,6 +49,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
   String _query = '';
   int _documentTab = 0;
   int? _folderId;
+  final Set<int> _deletingDocumentIds = <int>{};
 
   @override
   void initState() {
@@ -105,12 +107,16 @@ class _DocumentsPageState extends State<DocumentsPage> {
     if (!hasPending) return;
     _refreshTimer = Timer(const Duration(seconds: 6), () {
       if (!mounted) return;
-      setState(() => _future = _load());
+      setState(() {
+        _future = _load();
+      });
     });
   }
 
   Future<void> _refresh() async {
-    setState(() => _future = _load());
+    setState(() {
+      _future = _load();
+    });
     await _future;
   }
 
@@ -128,30 +134,19 @@ class _DocumentsPageState extends State<DocumentsPage> {
   }
 
   Future<void> _deleteDocument(ScanResult result) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Удалить документ?'),
-        content: Text(
-          '«${result.title ?? result.fileName ?? 'Документ'}» будет удалён из истории проверок.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.delete_outline_rounded),
-            label: const Text('Удалить'),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFDF3E48),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await showOySynActionDialog(
+      context,
+      title: 'Удалить документ?',
+      message:
+          '«${result.title ?? result.fileName ?? 'Документ'}» будет перемещён в раздел удалённых документов.',
+      confirmLabel: 'Удалить',
+      icon: Icons.delete_outline_rounded,
+      confirmIcon: Icons.delete_outline_rounded,
+      destructive: true,
     );
     if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingDocumentIds.add(result.id));
 
     try {
       await ScanService.deleteCheck(result.id);
@@ -167,6 +162,10 @@ class _DocumentsPageState extends State<DocumentsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _deletingDocumentIds.remove(result.id));
+      }
     }
   }
 
@@ -185,9 +184,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
     final selected = await showModalBottomSheet<int>(
       context: context,
       useSafeArea: true,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _FoldersSheet(
-        future: ScanService.getFolders(),
         selectedId: _folderId,
       ),
     );
@@ -197,6 +196,36 @@ class _DocumentsPageState extends State<DocumentsPage> {
       _page = 1;
       _future = _load();
     });
+  }
+
+  Future<void> _assignDocumentToFolder(ScanResult result) async {
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _FoldersSheet(selectedId: null),
+    );
+    if (selected == null || !mounted) return;
+    try {
+      await ScanService.assignCheckFolder(
+        result.id,
+        selected < 0 ? null : selected,
+      );
+      if (!mounted) return;
+      await _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Папка документа изменена.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
   }
 
   void _openDeletedDocuments(Map<String, dynamic>? user) {
@@ -333,7 +362,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
               ),
               const SizedBox(height: 12),
               if (_documentTab == 1)
-                const _PairChecksState()
+                const PairChecksPanel()
               else if (snapshot.hasError)
                 const _DocumentsMessage(
                   icon: Icons.wifi_off_rounded,
@@ -357,12 +386,33 @@ class _DocumentsPageState extends State<DocumentsPage> {
                       detailed: true,
                       onTap:
                           document.canOpen ? () => _openResult(result) : null,
-                      action: IconButton(
-                        onPressed: () => _deleteDocument(result),
-                        tooltip: 'Удалить документ',
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        color: const Color(0xFFDF3E48),
-                        visualDensity: VisualDensity.compact,
+                      action: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            onPressed: () => _assignDocumentToFolder(result),
+                            tooltip: 'Переместить в папку',
+                            icon: const Icon(Icons.drive_file_move_outlined),
+                            color: OySynAuthTokens.primaryBlue,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          IconButton(
+                            onPressed: _deletingDocumentIds.contains(result.id)
+                                ? null
+                                : () => _deleteDocument(result),
+                            tooltip: 'Удалить документ',
+                            icon: _deletingDocumentIds.contains(result.id)
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.delete_outline_rounded),
+                            color: const Color(0xFFDF3E48),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
                       ),
                     );
                   }),
@@ -581,41 +631,91 @@ class _DocumentTabs extends StatelessWidget {
       );
 }
 
-class _PairChecksState extends StatelessWidget {
-  const _PairChecksState();
-
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: OySynAuthTokens.divider),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Column(
-          children: [
-            Icon(Icons.compare_arrows_rounded,
-                size: 36, color: OySynAuthTokens.primaryBlue),
-            SizedBox(height: 12),
-            Text('Здесь пока нет проверок',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-            SizedBox(height: 6),
-            Text(
-              'Парные проверки появятся здесь после их создания.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: OySynAuthTokens.textMuted, height: 1.4),
-            ),
-          ],
-        ),
-      );
-}
-
-class _FoldersSheet extends StatelessWidget {
-  final Future<List<Map<String, dynamic>>> future;
+class _FoldersSheet extends StatefulWidget {
   final int? selectedId;
 
-  const _FoldersSheet({required this.future, required this.selectedId});
+  const _FoldersSheet({required this.selectedId});
+
+  @override
+  State<_FoldersSheet> createState() => _FoldersSheetState();
+}
+
+class _FoldersSheetState extends State<_FoldersSheet> {
+  late Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = ScanService.getFolders();
+  }
+
+  Future<void> _createFolder() async {
+    final name = await showOySynTextInputDialog(
+      context,
+      title: 'Новая папка',
+      label: 'Название папки',
+      confirmLabel: 'Создать',
+      icon: Icons.create_new_folder_outlined,
+    );
+    if (name == null || name.trim().isEmpty || !mounted) return;
+    try {
+      final folder = await ScanService.createFolder(name.trim());
+      final id = folder['id'] is num
+          ? (folder['id'] as num).toInt()
+          : int.tryParse('${folder['id']}');
+      if (!mounted) return;
+      if (id != null) {
+        Navigator.of(context).pop(id);
+        return;
+      }
+      setState(() {
+        _future = ScanService.getFolders();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  Future<void> _renameFolder(Map<String, dynamic> folder) async {
+    final id = folder['id'] is num
+        ? (folder['id'] as num).toInt()
+        : int.tryParse('${folder['id']}');
+    if (id == null) return;
+    final currentName = folder['name']?.toString() ?? '';
+    final name = await showOySynTextInputDialog(
+      context,
+      title: 'Переименовать папку',
+      label: 'Название папки',
+      confirmLabel: 'Сохранить',
+      initialValue: currentName,
+      icon: Icons.drive_file_rename_outline_rounded,
+    );
+    if (name == null || name.trim().isEmpty || name.trim() == currentName) {
+      return;
+    }
+    try {
+      await ScanService.renameFolder(id, name.trim());
+      if (!mounted) return;
+      setState(() {
+        _future = ScanService.getFolders();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Папка переименована')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Container(
@@ -638,11 +738,22 @@ class _FoldersSheet extends StatelessWidget {
             const Center(
                 child: SizedBox(width: 42, child: Divider(thickness: 4))),
             const SizedBox(height: 10),
-            const Text('Папки', style: OySynTextStyles.sectionTitle),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Папки', style: OySynTextStyles.sectionTitle),
+                ),
+                IconButton(
+                  onPressed: _createFolder,
+                  tooltip: 'Создать папку',
+                  icon: const Icon(Icons.create_new_folder_outlined),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             Flexible(
               child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: future,
+                future: _future,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -668,7 +779,7 @@ class _FoldersSheet extends StatelessWidget {
                       if (index == 0) {
                         return ListTile(
                           onTap: () => Navigator.of(context).pop(-1),
-                          tileColor: selectedId == null
+                          tileColor: widget.selectedId == null
                               ? const Color(0xFFEAF0FF)
                               : Colors.white,
                           shape: RoundedRectangleBorder(
@@ -678,7 +789,7 @@ class _FoldersSheet extends StatelessWidget {
                           leading: const Icon(Icons.folder_open_rounded,
                               color: OySynAuthTokens.primaryBlue),
                           title: const Text('Все документы'),
-                          trailing: selectedId == null
+                          trailing: widget.selectedId == null
                               ? const Icon(Icons.check_circle_rounded,
                                   color: OySynAuthTokens.primaryBlue)
                               : null,
@@ -688,7 +799,7 @@ class _FoldersSheet extends StatelessWidget {
                       final id = folder['id'] is num
                           ? (folder['id'] as num).toInt()
                           : int.tryParse('${folder['id']}');
-                      final active = id != null && id == selectedId;
+                      final active = id != null && id == widget.selectedId;
                       return ListTile(
                         onTap: id == null
                             ? null
@@ -702,10 +813,32 @@ class _FoldersSheet extends StatelessWidget {
                         leading: const Icon(Icons.folder_rounded,
                             color: OySynAuthTokens.primaryBlue),
                         title: Text(folder['name']?.toString() ?? 'Папка'),
-                        trailing: active
-                            ? const Icon(Icons.check_circle_rounded,
-                                color: OySynAuthTokens.primaryBlue)
-                            : Text('${folder['documents_count'] ?? 0}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (active)
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: OySynAuthTokens.primaryBlue,
+                                size: 21,
+                              )
+                            else
+                              Text(
+                                '${folder['documents_count'] ?? 0}',
+                                style: OySynTextStyles.caption,
+                              ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              onPressed: () => _renameFolder(folder),
+                              tooltip: 'Переименовать папку',
+                              visualDensity: VisualDensity.compact,
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                size: 20,
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     },
                   );

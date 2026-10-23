@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../services/profile_service.dart';
 import '../../../services/security_service.dart';
@@ -16,12 +17,14 @@ class UserProfilePage extends StatefulWidget {
 
 class _UserProfilePageState extends State<UserProfilePage> {
   late Future<Map<String, dynamic>?> _profile;
+  late Future<Map<String, dynamic>> _statistics;
   int _tab = 0;
 
   @override
   void initState() {
     super.initState();
     _profile = _loadProfile();
+    _statistics = ProfileService.getStatistics();
   }
 
   Future<Map<String, dynamic>?> _loadProfile() async {
@@ -70,6 +73,32 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
+  Future<bool> _saveNotifications(
+    Map<String, dynamic> user,
+    bool enabled,
+  ) async {
+    try {
+      final updated = await ProfileService.updateProfile({
+        'notification': enabled,
+      });
+      final merged = <String, dynamic>{...user, ...updated};
+      await TokenStorage.saveUser(merged);
+      if (mounted) setState(() => _profile = Future.value(merged));
+      return true;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.toString().replaceFirst('Exception: ', ''),
+            ),
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Map<String, dynamic>?>(
@@ -110,11 +139,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       ),
                     ],
                   ),
-                1 => const _InfoCard(
-                    icon: Icons.notifications_none_rounded,
-                    title: 'Уведомления',
-                    text:
-                        'Здесь будут отображаться важные уведомления аккаунта.'),
+                1 => _StatisticsCard(
+                    future: _statistics,
+                    onRetry: () => setState(() {
+                      _statistics = ProfileService.getStatistics();
+                    }),
+                  ),
+                2 => _NotificationSettingsCard(
+                    enabled: _bool(user['notification']),
+                    onSave: (enabled) => _saveNotifications(user, enabled),
+                  ),
                 _ => Column(
                     children: [
                       _NavigationCard(
@@ -153,6 +187,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     label: const Text('Выйти из аккаунта'),
                   ),
                 ),
+                const SizedBox(height: 18),
+                const _AppVersionLabel(),
               ],
             ],
           );
@@ -160,6 +196,33 @@ class _UserProfilePageState extends State<UserProfilePage> {
       ),
     );
   }
+}
+
+class _AppVersionLabel extends StatelessWidget {
+  const _AppVersionLabel();
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<PackageInfo>(
+        future: PackageInfo.fromPlatform(),
+        builder: (context, snapshot) {
+          final package = snapshot.data;
+          if (package == null) return const SizedBox.shrink();
+          return Semantics(
+            label:
+                'Версия приложения ${package.version}, сборка ${package.buildNumber}',
+            child: Center(
+              child: Text(
+                'Версия ${package.version} (${package.buildNumber})',
+                style: const TextStyle(
+                  color: OySynAuthTokens.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        },
+      );
 }
 
 class _PageHeader extends StatelessWidget {
@@ -260,41 +323,61 @@ class _Tabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Профиль', 'Уведомления', 'Защита'];
+    const items = [
+      (Icons.person_outline_rounded, 'Профиль'),
+      (Icons.query_stats_rounded, 'Статистика'),
+      (Icons.notifications_none_rounded, 'Уведомления'),
+      (Icons.shield_outlined, 'Защита'),
+    ];
     return Row(
-      children: List.generate(labels.length, (index) {
+      children: List.generate(items.length, (index) {
         final active = selected == index;
         return Expanded(
           child: Padding(
             padding: EdgeInsets.only(
-              right: index == labels.length - 1 ? 0 : 7,
+              right: index == items.length - 1 ? 0 : 6,
             ),
-            child: InkWell(
-              onTap: () => onChanged(index),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: active ? OySynAuthTokens.primaryBlue : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
+            child: Material(
+              color: active ? OySynAuthTokens.primaryBlue : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                onTap: () => onChanged(index),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  height: 42,
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
                       color: active
                           ? OySynAuthTokens.primaryBlue
-                          : OySynAuthTokens.divider),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      labels[index],
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: active ? Colors.white : const Color(0xFF5C677B),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
+                          : OySynAuthTokens.divider,
+                    ),
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          items[index].$1,
+                          size: 16,
+                          color:
+                              active ? Colors.white : OySynAuthTokens.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          items[index].$2,
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: active
+                                ? Colors.white
+                                : OySynAuthTokens.textDark,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -773,30 +856,407 @@ const _dataValueStyle = TextStyle(
   fontWeight: FontWeight.w800,
 );
 
-class _InfoCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String text;
-  const _InfoCard(
-      {required this.icon, required this.title, required this.text});
+class _StatisticsCard extends StatelessWidget {
+  final Future<Map<String, dynamic>> future;
+  final VoidCallback onRetry;
+
+  const _StatisticsCard({required this.future, required this.onRetry});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(18),
-        decoration: _card(),
-        child: Row(children: [
-          Icon(icon, color: OySynAuthTokens.primaryBlue, size: 30),
-          const SizedBox(width: 14),
-          Expanded(
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            height: 180,
+            decoration: _card(),
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: _card(),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.cloud_off_rounded,
+                  color: OySynAuthTokens.iconGrey,
+                  size: 34,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Не удалось загрузить статистику',
+                  style: OySynTextStyles.cardTitle,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Повторить'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final data = snapshot.data ?? const <String, dynamic>{};
+        final folders = data['folders'] is List
+            ? (data['folders'] as List)
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList()
+            : const <Map<String, dynamic>>[];
+        final average = _double(data['average_originality']);
+
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: _card(),
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(title, style: _sectionTitle),
-                const SizedBox(height: 4),
-                Text(text, style: _muted)
-              ])),
-        ]),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Статистика', style: OySynTextStyles.cardTitle),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7F9FD),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: OySynAuthTokens.divider),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _StatisticMetric(
+                            icon: Icons.fact_check_outlined,
+                            value: '${_int(data['total_checks'])}',
+                            label: 'Всего',
+                          ),
+                        ),
+                        const _MetricDivider(),
+                        Expanded(
+                          child: _StatisticMetric(
+                            icon: Icons.calendar_month_outlined,
+                            value: '${_int(data['checks_current_month'])}',
+                            label: 'За месяц',
+                          ),
+                        ),
+                        const _MetricDivider(),
+                        Expanded(
+                          child: _StatisticMetric(
+                            icon: Icons.percent_rounded,
+                            value:
+                                average == null ? '—' : '${_number(average)}%',
+                            label: 'Оригинальность',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              decoration: _card(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Статистика по папкам',
+                    style: OySynTextStyles.cardTitle,
+                  ),
+                  const SizedBox(height: 3),
+                  const Text(
+                    'Документы, завершённые проверки и оригинальность.',
+                    style: OySynTextStyles.caption,
+                  ),
+                  const SizedBox(height: 12),
+                  if (folders.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 18),
+                      child: Center(
+                        child: Text('Папок пока нет', style: _muted),
+                      ),
+                    )
+                  else
+                    for (var index = 0; index < folders.length; index++) ...[
+                      _FolderStatisticRow(folder: folders[index]),
+                      if (index != folders.length - 1)
+                        const Divider(
+                          height: 1,
+                          color: OySynAuthTokens.divider,
+                        ),
+                    ],
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StatisticMetric extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  const _StatisticMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final iconWidget = Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF0FF),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, size: 17, color: OySynAuthTokens.primaryBlue),
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        iconWidget,
+        const SizedBox(height: 5),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(value, style: _cardTitle),
+        ),
+        const SizedBox(height: 1),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, style: OySynTextStyles.caption),
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricDivider extends StatelessWidget {
+  const _MetricDivider();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(
+        height: 70,
+        child: VerticalDivider(
+          width: 1,
+          thickness: 1,
+          color: OySynAuthTokens.divider,
+        ),
       );
+}
+
+class _FolderStatisticRow extends StatelessWidget {
+  final Map<String, dynamic> folder;
+
+  const _FolderStatisticRow({required this.folder});
+
+  @override
+  Widget build(BuildContext context) {
+    final average = _double(folder['average_originality']);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF0FF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              folder['id'] == null
+                  ? Icons.folder_open_outlined
+                  : Icons.folder_outlined,
+              size: 18,
+              color: OySynAuthTokens.primaryBlue,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  folder['name']?.toString() ?? 'Папка',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: OySynTextStyles.cardTitle,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${_int(folder['documents'])} документов · '
+                  '${_int(folder['checked'])} проверено',
+                  style: OySynTextStyles.caption,
+                ),
+                if (average != null) ...[
+                  const SizedBox(height: 7),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: (average / 100).clamp(0, 1),
+                      minHeight: 5,
+                      backgroundColor: const Color(0xFFE1E8F5),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            average == null ? '—' : '${_number(average)}%',
+            style: const TextStyle(
+              color: OySynAuthTokens.deepBlue,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationSettingsCard extends StatefulWidget {
+  final bool enabled;
+  final Future<bool> Function(bool enabled) onSave;
+
+  const _NotificationSettingsCard({
+    required this.enabled,
+    required this.onSave,
+  });
+
+  @override
+  State<_NotificationSettingsCard> createState() =>
+      _NotificationSettingsCardState();
+}
+
+class _NotificationSettingsCardState extends State<_NotificationSettingsCard> {
+  late bool _value;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.enabled;
+  }
+
+  @override
+  void didUpdateWidget(covariant _NotificationSettingsCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.enabled != widget.enabled && !_saving) {
+      _value = widget.enabled;
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final saved = await widget.onSave(_value);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Настройки уведомлений сохранены')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Уведомления', style: OySynTextStyles.sectionTitle),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F9FD),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: OySynAuthTokens.divider),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF0FF),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(
+                    Icons.alternate_email_rounded,
+                    color: OySynAuthTokens.primaryBlue,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Email-уведомления',
+                          style: OySynTextStyles.cardTitle),
+                      SizedBox(height: 4),
+                      Text(
+                        'Получать важные уведомления системы на электронную почту.',
+                        style: OySynTextStyles.caption,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OySynSwitch(
+                  value: _value,
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _value = value),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Рассылку можно отключить в любой момент.',
+            style: OySynTextStyles.caption,
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: FilledButton.icon(
+              onPressed: _saving || _value == widget.enabled ? null : _save,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save_outlined),
+              label: Text(_saving ? 'Сохранение...' : 'Сохранить'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _NavigationCard extends StatelessWidget {
@@ -867,6 +1327,24 @@ BoxDecoration _card({double radius = 16}) => BoxDecoration(
 
 int _int(dynamic value) =>
     value is num ? value.toInt() : int.tryParse(value?.toString() ?? '') ?? 0;
+double? _double(dynamic value) {
+  if (value == null) return null;
+  return value is num
+      ? value.toDouble()
+      : double.tryParse(value.toString().replaceAll(',', '.'));
+}
+
+bool _bool(dynamic value) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  return const {'true', '1', 'yes'}.contains(value?.toString().toLowerCase());
+}
+
+String _number(double value) {
+  if (value == value.roundToDouble()) return value.toInt().toString();
+  return value.toStringAsFixed(1).replaceAll('.', ',');
+}
+
 String _text(dynamic value, String fallback) {
   final text = value?.toString().trim();
   return text == null || text.isEmpty ? fallback : text;

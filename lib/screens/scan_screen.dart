@@ -226,28 +226,20 @@ class _ScanScreenState extends State<ScanScreen> {
               children: [
                 _LabeledField(label: 'Название', controller: _titleController),
                 const SizedBox(height: 11),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _LabeledField(
-                        label: 'Автор',
-                        controller: _authorController,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _DocumentTypeField(
-                        value: _documentType,
-                        items: _documentTypes,
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => _documentType = value);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
+                _LabeledField(
+                  label: 'Автор',
+                  hint: 'Фамилия, имя, отчество автора',
+                  controller: _authorController,
+                ),
+                const SizedBox(height: 11),
+                _DocumentTypeField(
+                  value: _documentType,
+                  items: _documentTypes,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _documentType = value);
+                    }
+                  },
                 ),
                 const SizedBox(height: 11),
                 _LabeledField(

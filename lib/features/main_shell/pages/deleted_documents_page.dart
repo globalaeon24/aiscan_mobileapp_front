@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../services/scan_service.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/oysyn_controls.dart';
 
 class DeletedDocumentsPage extends StatefulWidget {
   final int organizationId;
@@ -33,7 +34,9 @@ class _DeletedDocumentsPageState extends State<DeletedDocumentsPage> {
       );
 
   Future<void> _refresh() async {
-    setState(() => _future = _load());
+    setState(() {
+      _future = _load();
+    });
     await _future;
   }
 
@@ -46,24 +49,13 @@ class _DeletedDocumentsPageState extends State<DeletedDocumentsPage> {
 
   Future<void> _restore(DeletedCheck item) async {
     final title = item.document.title ?? item.document.fileName ?? 'Документ';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Восстановить документ?'),
-        content:
-            Text('«$title» снова появится в списке документов пользователя.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(context).pop(true),
-            icon: const Icon(Icons.restore_rounded),
-            label: const Text('Восстановить'),
-          ),
-        ],
-      ),
+    final confirmed = await showOySynActionDialog(
+      context,
+      title: 'Восстановить документ?',
+      message: '«$title» снова появится в списке документов пользователя.',
+      confirmLabel: 'Восстановить',
+      icon: Icons.restore_rounded,
+      confirmIcon: Icons.restore_rounded,
     );
     if (confirmed != true || !mounted) return;
 

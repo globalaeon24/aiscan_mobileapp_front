@@ -105,6 +105,12 @@ class _DashboardPageState extends State<DashboardPage> {
   static int? _asNullableInt(dynamic value) =>
       value == null ? null : _asInt(value);
 
+  static int? _organizationId(Map<String, dynamic>? user) {
+    final value = user?['organization_id'] ?? user?['core_organization_id'];
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Map<String, dynamic>?>(
@@ -118,7 +124,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
           return RefreshIndicator(
             onRefresh: () async {
-              setState(() => _future = _load());
+              setState(() {
+                _future = _load();
+              });
               await _future;
             },
             child: CustomScrollView(
@@ -126,6 +134,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 SliverToBoxAdapter(
                   child: DashboardHeader(
                     checksAvailable: checksAvailable,
+                    isOrganizationUser: _organizationId(user) != null,
                     recentResults: data?.results ?? const [],
                   ),
                 ),

@@ -42,11 +42,26 @@ void main() {
     await pumpCompact(tester, const LoginRegisterScreen());
     expect(find.text('Войти'), findsOneWidget);
     expect(find.text('Продолжить с Google'), findsNothing);
-    expect(find.text('Зарегистрироваться'), findsNothing);
-    expect(
-      find.text('Для создания аккаунта обратитесь к администратору организации.'),
-      findsOneWidget,
+    expect(find.text('Зарегистрироваться'), findsOneWidget);
+  });
+
+  testWidgets('registration contains only required account fields',
+      (tester) async {
+    await pumpCompact(tester, const LoginRegisterScreen());
+    await tester.tap(find.text('Зарегистрироваться'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Создайте аккаунт'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Пароль'), findsOneWidget);
+    expect(find.text('Повторите пароль'), findsOneWidget);
+    expect(find.textContaining('Пользовательского соглашения'), findsOneWidget);
+
+    final registerButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Зарегистрироваться'),
     );
+    expect(registerButton.onPressed, isNull);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('PIN setup fits a compact Android viewport', (tester) async {

@@ -152,13 +152,95 @@ class AuthService {
     };
   }
 
-  static Future<bool> register(
+  static Future<RegistrationResult> register(
     String email,
     String password,
-    String name,
-    String organization,
+    String passwordConfirmation,
   ) async {
-    // Accounts are provisioned by an organization administrator in Oysyn Core.
-    return false;
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/register'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email.trim().toLowerCase(),
+              'password': password,
+              'password_confirmation': passwordConfirmation,
+              'agreement_accepted': true,
+              'agreement_version': '2026-10-22',
+              'agreement_url': 'https://oysyn.asia/ru/policy/',
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+
+      final decoded = _decodeBody(response.body);
+      final payload =
+          decoded is Map<String, dynamic> ? decoded : const <String, dynamic>{};
+      final code = payload['code']?.toString();
+      final message = payload['message']?.toString();
+
+      return switch (code) {
+        'registration_created' => RegistrationResult(
+            code: RegistrationCode.created,
+            message: message ?? 'Аккаунт создан. Подтвердите email.',
+          ),
+        'email_not_verified' => RegistrationResult(
+            code: RegistrationCode.emailNotVerified,
+            message: message ?? 'Email ещё не подтверждён.',
+          ),
+        'account_already_exists' => RegistrationResult(
+            code: RegistrationCode.accountAlreadyExists,
+            message: message ?? 'Аккаунт с таким email уже существует.',
+          ),
+        _ => RegistrationResult(
+            code: RegistrationCode.error,
+            message: _registrationErrorMessage(response.statusCode, payload),
+          ),
+      };
+    } on TimeoutException {
+      return const RegistrationResult(
+        code: RegistrationCode.error,
+        message: 'Сервер отвечает слишком долго. Попробуйте ещё раз.',
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Auth registration request failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return const RegistrationResult(
+        code: RegistrationCode.error,
+        message: 'Нет связи с сервером. Проверьте интернет-соединение.',
+      );
+    }
   }
+
+  static String _registrationErrorMessage(
+    int statusCode,
+    Map<String, dynamic> payload,
+  ) {
+    final serverMessage =
+        (payload['message'] ?? payload['detail'] ?? payload['error'])
+            ?.toString();
+    if (serverMessage != null && serverMessage.trim().isNotEmpty) {
+      return serverMessage.trim();
+    }
+    return switch (statusCode) {
+      422 => 'Проверьте правильность заполнения полей.',
+      429 => 'Слишком много попыток. Повторите немного позже.',
+      >= 500 => 'Сервис регистрации временно недоступен. Попробуйте позже.',
+      _ => 'Не удалось создать аккаунт. Попробуйте ещё раз.',
+    };
+  }
+}
+
+enum RegistrationCode {
+  created,
+  emailNotVerified,
+  accountAlreadyExists,
+  error,
+}
+
+class RegistrationResult {
+  const RegistrationResult({required this.code, required this.message});
+
+  final RegistrationCode code;
+  final String message;
 }

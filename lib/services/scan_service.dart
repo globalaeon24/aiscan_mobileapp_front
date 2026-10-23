@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
@@ -103,6 +103,52 @@ class CheckModule {
       );
 }
 
+class PairCheckItem {
+  final int id;
+  final String firstTitle;
+  final String secondTitle;
+  final String firstAuthor;
+  final String secondAuthor;
+  final String status;
+  final double firstToSecondSimilarity;
+  final double secondToFirstSimilarity;
+  final DateTime? createdAt;
+
+  const PairCheckItem({
+    required this.id,
+    required this.firstTitle,
+    required this.secondTitle,
+    required this.firstAuthor,
+    required this.secondAuthor,
+    required this.status,
+    required this.firstToSecondSimilarity,
+    required this.secondToFirstSimilarity,
+    required this.createdAt,
+  });
+
+  factory PairCheckItem.fromJson(Map<String, dynamic> json) {
+    final rawId = json['id'];
+    return PairCheckItem(
+      id: rawId is num ? rawId.toInt() : int.tryParse('$rawId') ?? 0,
+      firstTitle: json['a_title']?.toString() ?? '',
+      secondTitle: json['b_title']?.toString() ?? '',
+      firstAuthor: json['a_author']?.toString() ?? '',
+      secondAuthor: json['b_author']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      firstToSecondSimilarity: ScanService._asDouble(json['a_b_similarity']),
+      secondToFirstSimilarity: ScanService._asDouble(json['b_a_similarity']),
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
+    );
+  }
+}
+
+class PairChecksPage {
+  final List<PairCheckItem> items;
+  final int count;
+
+  const PairChecksPage({required this.items, required this.count});
+}
+
 class ScanService {
   static const String baseUrl = ApiConfig.baseUrl;
 
@@ -164,7 +210,6 @@ class ScanService {
       }
 
       final bytes = file.bytes;
-      final path = file.path;
       if (bytes != null) {
         request.files.add(
           http.MultipartFile.fromBytes(
@@ -174,7 +219,11 @@ class ScanService {
             contentType: mediaType,
           ),
         );
-      } else if (path != null && path.isNotEmpty) {
+      } else if (!kIsWeb) {
+        final path = file.path;
+        if (path == null || path.isEmpty) {
+          throw Exception('Не удалось прочитать выбранный файл.');
+        }
         request.files.add(
           await http.MultipartFile.fromPath(
             "document",
@@ -184,7 +233,9 @@ class ScanService {
           ),
         );
       } else {
-        throw Exception('Не удалось прочитать выбранный файл.');
+        throw Exception(
+          'Браузер не передал содержимое файла. Выберите документ повторно.',
+        );
       }
       return request;
     });
@@ -297,11 +348,15 @@ class ScanService {
 
   static Future<void> deleteCheck(int id) async {
     final response = await ApiService.delete('/checks/$id');
+    if (response.statusCode == 404) return;
     if (response.statusCode == 405 || response.statusCode == 501) {
       throw Exception('Удаление документов пока не поддерживается Core.');
     }
     if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception('Не удалось удалить документ (${response.statusCode}).');
+      throw Exception(_responseMessage(
+        response.body,
+        'Не удалось удалить документ (${response.statusCode}).',
+      ));
     }
   }
 
@@ -378,6 +433,162 @@ class ScanService {
     return data.whereType<Map<String, dynamic>>().toList();
   }
 
+  static Future<Map<String, dynamic>> createFolder(String name) async {
+    final response = await ApiService.post('/folders', body: {'name': name});
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Не удалось создать папку (${response.statusCode}).');
+    }
+    final payload = jsonDecode(response.body);
+    return payload is Map<String, dynamic> ? payload : const {};
+  }
+
+  static Future<Map<String, dynamic>> renameFolder(
+    int folderId,
+    String name,
+  ) async {
+    final response = await ApiService.patch(
+      '/folders/$folderId',
+      body: {'name': name},
+    );
+    if (response.statusCode != 200) {
+      throw Exception(_responseMessage(
+        response.body,
+        'Не удалось переименовать папку (${response.statusCode}).',
+      ));
+    }
+    final payload = jsonDecode(response.body);
+    return payload is Map<String, dynamic> ? payload : const {};
+  }
+
+  static Future<void> assignCheckFolder(int checkId, int? folderId) async {
+    final response = await ApiService.patch(
+      '/checks/$checkId',
+      body: {'folder_id': folderId},
+    );
+    if (response.statusCode != 200) {
+      throw Exception(_responseMessage(
+        response.body,
+        'Не удалось изменить папку документа (${response.statusCode}).',
+      ));
+    }
+  }
+
+  static String _responseMessage(String body, String fallback) {
+    try {
+      final payload = jsonDecode(body);
+      if (payload is Map<String, dynamic>) {
+        final detail =
+            payload['detail'] ?? payload['error'] ?? payload['message'];
+        if (detail != null && detail.toString().trim().isNotEmpty) {
+          return detail.toString().trim();
+        }
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  static Future<PairChecksPage> getPairChecks() async {
+    final response = await ApiService.get('/checks/pair-checks');
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Не удалось загрузить парные проверки (${response.statusCode}).');
+    }
+    final payload = jsonDecode(response.body);
+    final rawItems =
+        payload is Map<String, dynamic> && payload['results'] is List
+            ? payload['results'] as List
+            : const <dynamic>[];
+    return PairChecksPage(
+      items: rawItems
+          .whereType<Map>()
+          .map(
+              (item) => PairCheckItem.fromJson(Map<String, dynamic>.from(item)))
+          .where((item) => item.id > 0)
+          .toList(),
+      count:
+          _asInt(payload is Map<String, dynamic> ? payload['count'] : null) ??
+              rawItems.length,
+    );
+  }
+
+  static Future<int> createPairCheck({
+    required PlatformFile firstDocument,
+    required PlatformFile secondDocument,
+    required String firstTitle,
+    required String secondTitle,
+    required String firstAuthor,
+    required String secondAuthor,
+  }) async {
+    final uri = Uri.parse('$baseUrl/checks/pair-checks');
+    final response = await ApiService.sendMultipart((token) async {
+      final request = http.MultipartRequest('POST', uri);
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields.addAll({
+        'a_title': firstTitle.trim(),
+        'b_title': secondTitle.trim(),
+        'a_author': firstAuthor.trim(),
+        'b_author': secondAuthor.trim(),
+      });
+      request.files.add(await _pairFilePart('a_document', firstDocument));
+      request.files.add(await _pairFilePart('b_document', secondDocument));
+      return request;
+    });
+    final body = await response.stream.bytesToString();
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      var message = 'Не удалось запустить парную проверку.';
+      try {
+        final payload = jsonDecode(body);
+        if (payload is Map<String, dynamic>) {
+          final detail = payload['detail'] ?? payload['error'];
+          if (detail != null && '$detail'.trim().isNotEmpty) {
+            message = '$detail'.trim();
+          }
+        }
+      } catch (_) {}
+      throw Exception(message);
+    }
+    final payload = jsonDecode(body);
+    return _asInt(payload is Map<String, dynamic> ? payload['id'] : null) ?? 0;
+  }
+
+  static Future<http.MultipartFile> _pairFilePart(
+    String field,
+    PlatformFile file,
+  ) async {
+    final mediaType = _mediaTypeForFile(file.name);
+    if (file.bytes != null) {
+      return http.MultipartFile.fromBytes(
+        field,
+        file.bytes!,
+        filename: file.name,
+        contentType: mediaType,
+      );
+    }
+    if (file.path != null && file.path!.isNotEmpty) {
+      return http.MultipartFile.fromPath(
+        field,
+        file.path!,
+        filename: file.name,
+        contentType: mediaType,
+      );
+    }
+    throw Exception('Не удалось прочитать выбранный файл.');
+  }
+
+  static MediaType _mediaTypeForFile(String fileName) {
+    final name = fileName.toLowerCase();
+    if (name.endsWith('.pdf')) return MediaType('application', 'pdf');
+    if (name.endsWith('.docx')) {
+      return MediaType(
+        'application',
+        'vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+    }
+    if (name.endsWith('.doc')) return MediaType('application', 'msword');
+    if (name.endsWith('.txt')) return MediaType('text', 'plain');
+    return MediaType('application', 'octet-stream');
+  }
+
   /// ================================================================
   /// 5) Детальный результат
   /// ================================================================
@@ -426,5 +637,10 @@ class ScanService {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '');
+  }
+
+  static double _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 }

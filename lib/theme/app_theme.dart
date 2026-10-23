@@ -47,6 +47,38 @@ class OySynTextStyles {
     letterSpacing: 0,
   );
 
+  static const TextStyle pageTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 24,
+    height: 30 / 24,
+    fontWeight: FontWeight.w800,
+    letterSpacing: 0,
+  );
+
+  static const TextStyle cardTitle = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 16,
+    height: 21 / 16,
+    fontWeight: FontWeight.w800,
+    letterSpacing: 0,
+  );
+
+  static const TextStyle body = TextStyle(
+    color: OySynAuthTokens.textDark,
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0,
+  );
+
+  static const TextStyle caption = TextStyle(
+    color: OySynAuthTokens.textMuted,
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0,
+  );
+
   static const TextStyle recentDocumentsTitle = TextStyle(
     color: OySynAuthTokens.textDark,
     fontSize: 15,

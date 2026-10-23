@@ -4,6 +4,8 @@ import '../../../services/profile_service.dart';
 import '../../../theme/app_theme.dart';
 import 'organization_billing_page.dart';
 import 'organization_billing_journal_page.dart';
+import 'organization_administration_page.dart';
+import 'organization_edit_page.dart';
 import 'organization_reports_page.dart';
 import '../../../widgets/oysyn_controls.dart';
 import 'organization_users_page.dart';
@@ -42,7 +44,9 @@ class _OrganizationPageState extends State<OrganizationPage> {
               return _ErrorState(
                 message: snapshot.error.toString(),
                 onRetry: () {
-                  setState(() => _future = ProfileService.getOrganizations());
+                  setState(() {
+                    _future = ProfileService.getOrganizations();
+                  });
                 },
               );
             }
@@ -56,6 +60,9 @@ class _OrganizationPageState extends State<OrganizationPage> {
               organization: selected,
               organizations: organizations,
               onSelected: (id) => setState(() => _selectedOrganizationId = id),
+              onRefresh: () => setState(() {
+                _future = ProfileService.getOrganizations();
+              }),
             );
           },
         ),
@@ -79,11 +86,13 @@ class _OrganizationDetails extends StatelessWidget {
   final Map<String, dynamic> organization;
   final List<Map<String, dynamic>> organizations;
   final ValueChanged<int> onSelected;
+  final VoidCallback onRefresh;
 
   const _OrganizationDetails({
     required this.organization,
     required this.organizations,
     required this.onSelected,
+    required this.onRefresh,
   });
 
   @override
@@ -142,8 +151,20 @@ class _OrganizationDetails extends StatelessWidget {
             _OrganizationMenuItem(
               icon: Icons.business_rounded,
               title: 'Данные организации',
-              subtitle: 'Название, город, адрес и статус',
-              onTap: () => _showInfo(context, title, organization),
+              subtitle: 'Название, город, адрес и описание',
+              onTap: id == null
+                  ? null
+                  : () async {
+                      final changed = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => OrganizationEditPage(
+                            organizationId: id,
+                            organization: organization,
+                          ),
+                        ),
+                      );
+                      if (changed == true) onRefresh();
+                    },
             ),
             _OrganizationMenuItem(
               icon: Icons.bar_chart_rounded,
@@ -182,9 +203,17 @@ class _OrganizationDetails extends StatelessWidget {
             _OrganizationMenuItem(
               icon: Icons.tune_rounded,
               title: 'Администрирование',
-              subtitle: 'Пороги, эксперты, индексация, API',
+              subtitle: 'Пороги проверки и API-доступ',
               badge: apiSettings > 0 ? '$apiSettings' : null,
-              onTap: id == null ? null : () => _showApiSettings(context, id),
+              onTap: id == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => OrganizationAdministrationPage(
+                            organizationId: id,
+                          ),
+                        ),
+                      ),
             ),
           ],
         ),
@@ -225,130 +254,6 @@ class _OrganizationDetails extends StatelessWidget {
       ],
     );
   }
-
-  void _showInfo(
-    BuildContext context,
-    String title,
-    Map<String, dynamic> organization,
-  ) {
-    _showDataSheet(
-      context,
-      title,
-      [
-        ('Город', _text(organization['city_display'], 'Не указан')),
-        ('Адрес', _text(organization['address'], 'Не указан')),
-        (
-          'Проверок доступно',
-          '${_asInt(organization['checks_available']) ?? 0}'
-        ),
-      ],
-    );
-  }
-
-  Future<void> _showApiSettings(BuildContext context, int id) async {
-    try {
-      final data = await ProfileService.getOrganizationApiSettings(id);
-      if (!context.mounted) return;
-      final tokens = data['api_tokens'] as List<dynamic>? ?? const [];
-      final rows = tokens
-          .whereType<Map<String, dynamic>>()
-          .map((token) => (
-                _text(token['name'], 'API-токен'),
-                token['is_active'] == true ? 'Активен' : 'Отключен',
-              ))
-          .toList();
-      _showDataSheet(
-        context,
-        'Администрирование',
-        rows,
-        emptyText:
-            'Скоро здесь появятся настройки порогов, экспертов, индексации и API-доступа.',
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      _showDataSheet(
-        context,
-        'Администрирование',
-        const [],
-        emptyText:
-            'Скоро здесь появятся настройки порогов, экспертов, индексации и API-доступа.',
-      );
-    }
-  }
-}
-
-void _showDataSheet(
-  BuildContext context,
-  String title,
-  List<(String, String)> rows, {
-  String emptyText = 'Данные пока отсутствуют',
-}) {
-  showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .72,
-      ),
-      padding: EdgeInsets.fromLTRB(
-        22,
-        10,
-        22,
-        22 + oysynSystemBottomInset(context),
-      ),
-      decoration: const BoxDecoration(
-        color: OySynAuthTokens.appBackground,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: const Color(0xFFC9D1E2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(title, style: _Styles.cardTitle),
-          const SizedBox(height: 14),
-          Flexible(
-            child: rows.isEmpty
-                ? Text(emptyText, style: _Styles.subtitle)
-                : ListView(
-                    shrinkWrap: true,
-                    children: rows
-                        .map((row) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                      child: Text(row.$1, style: _Styles.body)),
-                                  const SizedBox(width: 14),
-                                  Flexible(
-                                    child: Text(
-                                      row.$2,
-                                      textAlign: TextAlign.right,
-                                      style: _Styles.subtitle,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ))
-                        .toList(),
-                  ),
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 class _OrganizationHeader extends StatelessWidget {
@@ -626,10 +531,6 @@ class _Styles {
       color: OySynAuthTokens.textDark,
       fontSize: 17,
       fontWeight: FontWeight.w800);
-  static const body = TextStyle(
-      color: OySynAuthTokens.textDark,
-      fontSize: 15,
-      fontWeight: FontWeight.w700);
   static const subtitle = TextStyle(
       color: OySynAuthTokens.textMuted,
       fontSize: 14,

@@ -29,6 +29,11 @@ class ProfileService {
     }
   }
 
+  static Future<Map<String, dynamic>> getStatistics() async {
+    final data = await _get('/me/statistics');
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
   static Future<Map<String, dynamic>> getOrganization(
       int organizationId) async {
     final res = await ApiService.get('/organizations/$organizationId');
@@ -38,6 +43,18 @@ class ProfileService {
     } else {
       throw Exception('Не удалось загрузить организацию (${res.statusCode}).');
     }
+  }
+
+  static Future<Map<String, dynamic>> updateOrganization(
+    int organizationId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'PATCH',
+      '/organizations/$organizationId',
+      payload,
+    );
+    return data is Map<String, dynamic> ? data : const {};
   }
 
   static Future<List<Map<String, dynamic>>> getOrganizations() async {
@@ -81,6 +98,36 @@ class ProfileService {
   static Future<Map<String, dynamic>> getOrganizationApiSettings(
       int organizationId) async {
     final data = await _get('/organizations/$organizationId/api-settings');
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> createOrganizationApiToken(
+    int organizationId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'POST',
+      '/organizations/$organizationId/api-settings',
+      payload,
+    );
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> getOrganizationThresholds(
+      int organizationId) async {
+    final data = await _get('/organizations/$organizationId/thresholds');
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> updateOrganizationThresholds(
+    int organizationId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'PATCH',
+      '/organizations/$organizationId/thresholds',
+      payload,
+    );
     return data is Map<String, dynamic> ? data : const {};
   }
 

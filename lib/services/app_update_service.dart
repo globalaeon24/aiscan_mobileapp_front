@@ -14,6 +14,9 @@ class AppUpdateInfo {
   final bool enabled;
   final String latestVersion;
   final int latestBuild;
+  final int minimumSupportedBuild;
+  final bool updateRequired;
+  final int remindAfterHours;
   final String title;
   final String message;
   final Uri? storeUrl;
@@ -22,6 +25,9 @@ class AppUpdateInfo {
     required this.enabled,
     required this.latestVersion,
     required this.latestBuild,
+    required this.minimumSupportedBuild,
+    required this.updateRequired,
+    required this.remindAfterHours,
     required this.title,
     required this.message,
     required this.storeUrl,
@@ -33,6 +39,10 @@ class AppUpdateInfo {
       enabled: json['enabled'] == true,
       latestVersion: json['latest_version']?.toString() ?? '0.0.0',
       latestBuild: _asInt(json['latest_build']),
+      minimumSupportedBuild: _asInt(json['minimum_supported_build']),
+      updateRequired:
+          json['update_required'] == true || json['force_update'] == true,
+      remindAfterHours: _positiveInt(json['remind_after_hours'], fallback: 24),
       title: json['title']?.toString().trim().isNotEmpty == true
           ? json['title'].toString().trim()
           : 'Доступна новая версия OySyn',
@@ -47,6 +57,10 @@ class AppUpdateInfo {
     final comparison = compareVersions(latestVersion, installedVersion);
     return comparison > 0 || (comparison == 0 && latestBuild > installedBuild);
   }
+
+  bool isRequiredFor(int installedBuild) =>
+      updateRequired ||
+      (minimumSupportedBuild > 0 && installedBuild < minimumSupportedBuild);
 
   static int compareVersions(String left, String right) {
     final leftParts = _versionParts(left);
@@ -71,15 +85,27 @@ class AppUpdateInfo {
     if (value is num) return value.toInt();
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
+
+  static int _positiveInt(dynamic value, {required int fallback}) {
+    final parsed = _asInt(value);
+    return parsed > 0 ? parsed : fallback;
+  }
 }
 
 class AppUpdateService {
-  static const _postponeDuration = Duration(hours: 24);
-  static bool _checkedThisLaunch = false;
+  static const _minimumCheckInterval = Duration(minutes: 5);
+  static bool _dialogVisible = false;
+  static DateTime? _lastCheckedAt;
 
   static Future<void> showIfNeeded(BuildContext context) async {
-    if (_checkedThisLaunch || kIsWeb) return;
-    _checkedThisLaunch = true;
+    if (_dialogVisible || kIsWeb) return;
+
+    final now = DateTime.now();
+    if (_lastCheckedAt != null &&
+        now.difference(_lastCheckedAt!) < _minimumCheckInterval) {
+      return;
+    }
+    _lastCheckedAt = now;
 
     final platform = switch (defaultTargetPlatform) {
       TargetPlatform.android => 'android',
@@ -108,67 +134,86 @@ class AppUpdateService {
 
       final prefs = await SharedPreferences.getInstance();
       final postponeKey = _postponeKey(platform, update);
-      final postponedAt = DateTime.tryParse(prefs.getString(postponeKey) ?? '');
-      if (postponedAt != null &&
-          DateTime.now().difference(postponedAt) < _postponeDuration) {
+      final nextPromptAt =
+          DateTime.tryParse(prefs.getString(postponeKey) ?? '');
+      final required = update.isRequiredFor(installedBuild);
+      if (!required && nextPromptAt != null && now.isBefore(nextPromptAt)) {
         return;
       }
       if (!context.mounted) return;
 
+      _dialogVisible = true;
       final shouldUpdate = await showDialog<bool>(
         context: context,
-        barrierDismissible: true,
-        builder: (context) => AlertDialog(
-          icon: Container(
-            width: 52,
-            height: 52,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0FF),
-              borderRadius: BorderRadius.circular(12),
+        barrierDismissible: !required,
+        builder: (dialogContext) => PopScope(
+          canPop: !required,
+          child: AlertDialog(
+            icon: Container(
+              width: 52,
+              height: 52,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF0FF),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.system_update_alt_rounded,
+                color: OySynAuthTokens.primaryBlue,
+                size: 28,
+              ),
             ),
-            child: const Icon(
-              Icons.system_update_alt_rounded,
-              color: OySynAuthTokens.primaryBlue,
-              size: 28,
+            title: Text(update.title, textAlign: TextAlign.center),
+            content: Text(
+              update.message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: OySynAuthTokens.textMuted,
+                height: 1.45,
+              ),
             ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              if (!required)
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Позже'),
+                ),
+              FilledButton.icon(
+                onPressed: () async {
+                  if (required) {
+                    await _openStore(update.storeUrl!);
+                  } else {
+                    Navigator.of(dialogContext).pop(true);
+                  }
+                },
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('Обновить'),
+              ),
+            ],
           ),
-          title: Text(update.title, textAlign: TextAlign.center),
-          content: Text(
-            update.message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: OySynAuthTokens.textMuted,
-              height: 1.45,
-            ),
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Позже'),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.of(context).pop(true),
-              icon: const Icon(Icons.open_in_new_rounded),
-              label: const Text('Обновить'),
-            ),
-          ],
         ),
       );
+      _dialogVisible = false;
 
       if (shouldUpdate == true) {
-        await launchUrl(
-          update.storeUrl!,
-          mode: LaunchMode.externalApplication,
+        await _openStore(update.storeUrl!);
+      } else if (!required) {
+        final nextPrompt = DateTime.now().add(
+          Duration(hours: update.remindAfterHours),
         );
-      } else {
-        await prefs.setString(postponeKey, DateTime.now().toIso8601String());
+        await prefs.setString(postponeKey, nextPrompt.toIso8601String());
       }
     } catch (_) {
+      _dialogVisible = false;
       // Проверка обновлений не должна мешать запуску приложения.
     }
   }
+
+  static Future<void> _openStore(Uri storeUrl) => launchUrl(
+        storeUrl,
+        mode: LaunchMode.externalApplication,
+      );
 
   static String _postponeKey(String platform, AppUpdateInfo update) =>
       'app_update_postponed_${platform}_${update.latestVersion}_${update.latestBuild}';

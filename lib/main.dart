@@ -30,17 +30,40 @@ void main() async {
               : '/security-setup',
     ),
   );
-
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    final context = navigatorKey.currentState?.overlay?.context;
-    if (context != null) AppUpdateService.showIfNeeded(context);
-  });
 }
 
-class ScanAIApp extends StatelessWidget {
+class ScanAIApp extends StatefulWidget {
   final String initialRoute;
 
   const ScanAIApp({super.key, required this.initialRoute});
+
+  @override
+  State<ScanAIApp> createState() => _ScanAIAppState();
+}
+
+class _ScanAIAppState extends State<ScanAIApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdate());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkForUpdate();
+  }
+
+  void _checkForUpdate() {
+    final context = navigatorKey.currentState?.overlay?.context;
+    if (context != null) AppUpdateService.showIfNeeded(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +72,7 @@ class ScanAIApp extends StatelessWidget {
       title: 'ScanAI',
       theme: buildAppTheme(),
       debugShowCheckedModeBanner: false,
-      initialRoute: initialRoute,
+      initialRoute: widget.initialRoute,
       routes: {
         '/login': (_) => const LoginRegisterScreen(),
         '/security-setup': (_) => const SecuritySetupScreen(),

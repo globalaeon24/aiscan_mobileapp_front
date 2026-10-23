@@ -44,17 +44,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
               onPressed: () async {
                 setState(() => loading = true);
 
-                final ok = await AuthService.register(
+                final result = await AuthService.register(
                   emailCtrl.text,
                   passCtrl.text,
-                  nameCtrl.text,
-                  orgCtrl.text,
+                  passCtrl.text,
                 );
 
                 if (!mounted) return;
                 setState(() => loading = false);
 
-                if (ok && context.mounted) Navigator.pop(context);
+                if (result.code == RegistrationCode.created &&
+                    context.mounted) {
+                  Navigator.pop(context);
+                }
               },
               child: loading
                   ? CircularProgressIndicator()

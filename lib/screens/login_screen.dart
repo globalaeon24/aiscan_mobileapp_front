@@ -61,19 +61,18 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen>
 
     setState(() => loading = true);
 
-    final ok = await AuthService.register(
+    final result = await AuthService.register(
       regEmailCtrl.text.trim(),
       regPassCtrl.text.trim(),
-      regNameCtrl.text.trim(),
-      regOrgCtrl.text.trim(),
+      regPass2Ctrl.text.trim(),
     );
 
     setState(() => loading = false);
 
-    if (ok && mounted) {
-      Navigator.pushReplacementNamed(context, "/security-setup");
+    if (result.code == RegistrationCode.created && mounted) {
+      Navigator.pop(context);
     } else {
-      _showError("Ошибка регистрации.");
+      _showError(result.message);
     }
   }
 
