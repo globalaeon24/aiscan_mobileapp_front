@@ -28,6 +28,17 @@ class AppNotification {
     final checkJson = payload['check'] is Map
         ? Map<String, dynamic>.from(payload['check'] as Map)
         : null;
+    final checkId = _asInt(payload['check_id']);
+    final check = checkJson == null && checkId > 0
+        ? ScanResult.fromJson({
+            'id': checkId,
+            'title': json['body'],
+            'status': payload['check_status'],
+            'created_at': json['created_at'],
+          })
+        : checkJson == null
+            ? null
+            : ScanResult.fromJson(checkJson);
     return AppNotification(
       id: _asInt(json['id']),
       type: json['type']?.toString() ?? '',
@@ -36,7 +47,7 @@ class AppNotification {
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
           DateTime.now(),
       isRead: json['is_read'] == true,
-      check: checkJson == null ? null : ScanResult.fromJson(checkJson),
+      check: check,
     );
   }
 

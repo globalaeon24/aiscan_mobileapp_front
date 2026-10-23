@@ -9,9 +9,6 @@ import 'device_identity_service.dart';
 
 class AuthService {
   static const baseUrl = ApiConfig.baseUrl;
-  static const _demoEnabled = bool.fromEnvironment('ENABLE_DEMO_LOGIN');
-  static const _demoUsername = String.fromEnvironment('DEMO_USERNAME');
-  static const _demoPassword = String.fromEnvironment('DEMO_PASSWORD');
   static String? lastLoginError;
 
   /// ---------- ЛОГИН ----------
@@ -19,18 +16,6 @@ class AuthService {
     lastLoginError = null;
     final trimmedEmail = email.trim();
     final trimmedPassword = password.trim();
-    final normalizedLogin = trimmedEmail.toLowerCase();
-    if (_demoEnabled &&
-        _demoUsername.isNotEmpty &&
-        normalizedLogin == _demoUsername.toLowerCase() &&
-        trimmedPassword == _demoPassword) {
-      await TokenStorage.saveToken('demo_oysyn_token');
-      await TokenStorage.saveUser({
-        "full_name": "Demo User",
-        "email": "oysyn",
-      });
-      return true;
-    }
 
     late final http.Response res;
     try {
