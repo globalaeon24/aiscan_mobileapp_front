@@ -1,58 +1,67 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_theme.dart';
-import '../data/demo_dashboard_data.dart';
 
 class MonthSummaryCard extends StatelessWidget {
-  const MonthSummaryCard({super.key});
+  final int totalDocuments;
+  final int averageOriginality;
+  final int monthlyDocuments;
+
+  const MonthSummaryCard({
+    super.key,
+    required this.totalDocuments,
+    required this.averageOriginality,
+    required this.monthlyDocuments,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: OySynAuthTokens.primaryBlue,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Сводка за месяц',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: const [
-              Expanded(
-                child: _SummaryMetric(
-                  value: '${DemoDashboardData.totalDocuments}',
-                  label: 'Всего',
-                ),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _SummaryMetric(
-                  value: '${DemoDashboardData.averageOriginality}%',
-                  label: 'Средний %',
-                ),
-              ),
-              SizedBox(width: 10),
-              Expanded(
-                child: _SummaryMetric(
-                  value: '${DemoDashboardData.completedWorks}',
-                  label: 'Прошедших\nработ',
-                ),
-              ),
-            ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: OySynAuthTokens.divider),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF142350).withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
+      child: Row(
+        children: [
+          Expanded(
+              child: _SummaryMetric(
+                  value: '$totalDocuments', label: 'Всего проверок')),
+          const _Divider(),
+          Expanded(
+            child: _SummaryMetric(
+              value: '$averageOriginality%',
+              label: 'Средняя ориг.',
+              valueColor: const Color(0xFF148A4E),
+            ),
+          ),
+          const _Divider(),
+          Expanded(
+              child: _SummaryMetric(
+                  value: '$monthlyDocuments', label: 'За месяц')),
+        ],
+      ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 42,
+      child: VerticalDivider(color: Color(0xFFEEF1F8), width: 1),
     );
   }
 }
@@ -60,47 +69,37 @@ class MonthSummaryCard extends StatelessWidget {
 class _SummaryMetric extends StatelessWidget {
   final String value;
   final String label;
+  final Color valueColor;
 
   const _SummaryMetric({
     required this.value,
     required this.label,
+    this.valueColor = OySynAuthTokens.textDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 86,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            maxLines: 1,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              height: 0.95,
-              fontWeight: FontWeight.w800,
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          maxLines: 1,
+          style: TextStyle(
+            color: valueColor,
+            fontSize: 20,
+            height: 1,
+            fontWeight: FontWeight.w800,
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              height: 1.2,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Color(0xFF7A8399), fontSize: 11),
+        ),
+      ],
     );
   }
 }

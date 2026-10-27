@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "OySyn Stage",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=APP_ENV=stage",
+        "--dart-define=API_BASE_URL=https://api-mobile-stage.oysyn.asia/api/v1"
+      ]
+    },
+    {
+      "name": "OySyn Production",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=APP_ENV=production",
+        "--dart-define=API_BASE_URL=https://api-mobile.oysyn.asia/api/v1"
+      ]
+    }
+  ]
+}

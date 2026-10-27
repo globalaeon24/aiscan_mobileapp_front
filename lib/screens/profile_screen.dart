@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/profile_service.dart';
+import '../services/security_service.dart';
 import '../storage/token_storage.dart';
-
-
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -41,13 +40,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
-  await TokenStorage.clear();
-  if (!mounted) return;
-  Navigator.of(context).pushNamedAndRemoveUntil(
-    "/login",
-    (route) => false,
-  );
-}
+    await TokenStorage.clear();
+    await SecurityService.clear();
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      "/login",
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

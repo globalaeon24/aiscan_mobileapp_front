@@ -13,8 +13,8 @@ class HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final aiColor =
-        result.aiPercentage >= 50 ? Colors.red : Colors.green;
+    final originality = result.originalityPercentage;
+    final originalityColor = originality >= 50 ? Colors.green : Colors.red;
 
     final date = result.createdAt;
     final dateStr =
@@ -29,20 +29,17 @@ class HistoryCard extends StatelessWidget {
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-
         title: Text(
           "Проверка №$titleIndex",
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-
         subtitle: Text("$dateStr · $timeStr"),
-
         trailing: Text(
-          "${result.aiPercentage.toStringAsFixed(1)}%",
+          "${originality.toStringAsFixed(1)}%",
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: aiColor,
+            color: originalityColor,
           ),
         ),
       ),

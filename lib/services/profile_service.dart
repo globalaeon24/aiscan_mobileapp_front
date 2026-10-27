@@ -1,27 +1,192 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../storage/token_storage.dart';
+
+import '../config/api_config.dart';
+import 'api_service.dart';
 
 class ProfileService {
-  static const baseUrl = "http://194.146.43.172:8082/api";
+  static const baseUrl = ApiConfig.baseUrl;
 
   static Future<Map<String, dynamic>> getProfile() async {
-    final token = await TokenStorage.getToken();
-    if (token == null) {
-      throw Exception("Нет токена авторизации.");
-    }
-
-    final res = await http.get(
-      Uri.parse("$baseUrl/auth/me"),
-      headers: {
-        "Authorization": "Bearer $token",
-      },
-    );
+    final res = await ApiService.get('/me');
 
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     } else {
-      return {};
+      throw Exception('Не удалось загрузить профиль (${res.statusCode}).');
     }
+  }
+
+  static Future<Map<String, dynamic>> updateProfile(
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send('PATCH', '/me', payload);
+    final updated = data is Map<String, dynamic> ? data : <String, dynamic>{};
+    try {
+      final fresh = await getProfile();
+      return {...fresh, ...updated, ...payload};
+    } catch (_) {
+      return {...updated, ...payload};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getStatistics() async {
+    final data = await _get('/me/statistics');
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> getOrganization(
+      int organizationId) async {
+    final res = await ApiService.get('/organizations/$organizationId');
+
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    } else {
+      throw Exception('Не удалось загрузить организацию (${res.statusCode}).');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateOrganization(
+    int organizationId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'PATCH',
+      '/organizations/$organizationId',
+      payload,
+    );
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<List<Map<String, dynamic>>> getOrganizations() async {
+    final data = await _get('/organizations');
+    if (data is! List) return const [];
+    return data.whereType<Map<String, dynamic>>().toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> getOrganizationUsers(
+      int organizationId) async {
+    final data = await _get('/organizations/$organizationId/users');
+    if (data is! List) return const [];
+    return data.whereType<Map<String, dynamic>>().toList();
+  }
+
+  static Future<Map<String, dynamic>> createOrganizationUser(
+    int organizationId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'POST',
+      '/organizations/$organizationId/users',
+      payload,
+    );
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> updateOrganizationUser(
+    int organizationId,
+    int userId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'PATCH',
+      '/organizations/$organizationId/users/$userId',
+      payload,
+    );
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> getOrganizationApiSettings(
+      int organizationId) async {
+    final data = await _get('/organizations/$organizationId/api-settings');
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> createOrganizationApiToken(
+    int organizationId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'POST',
+      '/organizations/$organizationId/api-settings',
+      payload,
+    );
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> getOrganizationThresholds(
+      int organizationId) async {
+    final data = await _get('/organizations/$organizationId/thresholds');
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<Map<String, dynamic>> updateOrganizationThresholds(
+    int organizationId,
+    Map<String, dynamic> payload,
+  ) async {
+    final data = await _send(
+      'PATCH',
+      '/organizations/$organizationId/thresholds',
+      payload,
+    );
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<List<Map<String, dynamic>>> getOrganizationBilling(
+      int organizationId) async {
+    final data = await _get('/organizations/$organizationId/billing');
+    if (data is! List) return const [];
+    return data.whereType<Map<String, dynamic>>().toList();
+  }
+
+  static Future<Map<String, dynamic>> updateOrganizationBilling(
+    int organizationId,
+    int userId,
+    int checksAvailable,
+  ) async {
+    final data = await _send(
+      'PATCH',
+      '/organizations/$organizationId/billing/$userId',
+      {'checks_available': checksAvailable},
+    );
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<List<Map<String, dynamic>>> getOrganizationBillingJournal(
+      int organizationId) async {
+    final data = await _get('/organizations/$organizationId/billing-journal');
+    if (data is! List) return const [];
+    return data.whereType<Map<String, dynamic>>().toList();
+  }
+
+  static Future<Map<String, dynamic>> getOrganizationReports(
+      int organizationId) async {
+    final data = await _get('/organizations/$organizationId/reports');
+    return data is Map<String, dynamic> ? data : const {};
+  }
+
+  static Future<dynamic> _get(String path) async {
+    final response = await ApiService.get(path);
+    if (response.statusCode != 200) {
+      throw Exception('Не удалось загрузить данные (${response.statusCode}).');
+    }
+    return jsonDecode(response.body);
+  }
+
+  static Future<dynamic> _send(
+    String method,
+    String path,
+    Map<String, dynamic> payload,
+  ) async {
+    final response = switch (method) {
+      'PATCH' => await ApiService.patch(path, body: payload),
+      'POST' => await ApiService.post(path, body: payload),
+      _ => throw UnsupportedError('Неподдерживаемый HTTP-метод: $method'),
+    };
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Не удалось сохранить данные (${response.statusCode}).');
+    }
+    return response.body.isEmpty
+        ? const <String, dynamic>{}
+        : jsonDecode(response.body);
   }
 }

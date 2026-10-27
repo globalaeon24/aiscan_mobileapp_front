@@ -1,6 +1,6 @@
-package com.example.scan_ai_app
+package asia.oysyn.mobile
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
 }
