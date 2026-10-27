@@ -29,7 +29,7 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   google_mlkit_text_recognition: ^0.15.0
-  pdf: ^3.10.8
+  pdf: ^3.13.1
   printing: ^5.12.0
   image_picker: ^1.0.7
   flutter:
