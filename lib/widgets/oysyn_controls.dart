@@ -64,32 +64,12 @@ Future<bool?> showOySynActionDialog(
             ),
           ),
           const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(false),
-                    child: const Text('Отмена'),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: FilledButton.icon(
-                    style: destructive
-                        ? FilledButton.styleFrom(backgroundColor: accent)
-                        : null,
-                    onPressed: () => Navigator.of(dialogContext).pop(true),
-                    icon: Icon(confirmIcon, size: 19),
-                    label: Text(confirmLabel),
-                  ),
-                ),
-              ),
-            ],
+          _OySynDialogActions(
+            confirmLabel: confirmLabel,
+            confirmIcon: confirmIcon,
+            confirmColor: destructive ? accent : null,
+            onCancel: () => Navigator.of(dialogContext).pop(false),
+            onConfirm: () => Navigator.of(dialogContext).pop(true),
           ),
         ],
       ),
@@ -168,6 +148,7 @@ class _OySynTextInputDialogState extends State<_OySynTextInputDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       contentPadding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -201,6 +182,7 @@ class _OySynTextInputDialogState extends State<_OySynTextInputDialog> {
             maxLength: 512,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submit(),
+            onTapOutside: (_) => FocusScope.of(context).unfocus(),
             decoration: InputDecoration(
               labelText: widget.label,
               errorText: _error,
@@ -208,32 +190,85 @@ class _OySynTextInputDialogState extends State<_OySynTextInputDialog> {
             ),
           ),
           const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Отмена'),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: FilledButton.icon(
-                    onPressed: _submit,
-                    icon: const Icon(Icons.check_rounded, size: 19),
-                    label: Text(widget.confirmLabel),
-                  ),
-                ),
-              ),
-            ],
+          _OySynDialogActions(
+            confirmLabel: widget.confirmLabel,
+            confirmIcon: Icons.check_rounded,
+            onCancel: () => Navigator.of(context).pop(),
+            onConfirm: _submit,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _OySynDialogActions extends StatelessWidget {
+  final String confirmLabel;
+  final IconData confirmIcon;
+  final Color? confirmColor;
+  final VoidCallback onCancel;
+  final VoidCallback onConfirm;
+
+  const _OySynDialogActions({
+    required this.confirmLabel,
+    required this.confirmIcon,
+    required this.onCancel,
+    required this.onConfirm,
+    this.confirmColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textScaler = MediaQuery.textScalerOf(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked = constraints.maxWidth < 330 || textScaler.scale(14) > 17;
+        final cancel = SizedBox(
+          height: 48,
+          child: OutlinedButton(
+            onPressed: onCancel,
+            child: const Text('Отмена', maxLines: 1),
+          ),
+        );
+        final confirm = SizedBox(
+          height: 48,
+          child: FilledButton(
+            style: confirmColor == null
+                ? null
+                : FilledButton.styleFrom(backgroundColor: confirmColor),
+            onPressed: onConfirm,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(confirmIcon, size: 19),
+                  const SizedBox(width: 8),
+                  Text(confirmLabel, maxLines: 1),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        if (stacked) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              confirm,
+              const SizedBox(height: 10),
+              cancel,
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: cancel),
+            const SizedBox(width: 10),
+            Expanded(flex: 2, child: confirm),
+          ],
+        );
+      },
     );
   }
 }

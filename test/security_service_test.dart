@@ -18,10 +18,12 @@ void main() {
     final storage = const FlutterSecureStorage();
     final hash = await storage.read(key: 'security_pin_hash');
     final salt = await storage.read(key: 'security_pin_salt');
+    final iterations = await storage.read(key: 'security_pin_iterations');
 
     expect(hash, isNotNull);
     expect(hash, isNot(contains('1234')));
     expect(salt, isNotNull);
+    expect(iterations, isNotNull);
     expect(await SecurityService.verifyPin('1234'), isTrue);
     expect(await SecurityService.verifyPin('4321'), isFalse);
   });

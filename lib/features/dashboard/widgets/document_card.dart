@@ -25,8 +25,8 @@ class DocumentCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          constraints: BoxConstraints(minHeight: detailed ? 110 : 68),
-          padding: const EdgeInsets.all(12),
+          constraints: BoxConstraints(minHeight: detailed ? 88 : 60),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFE7ECF5)),
@@ -43,7 +43,7 @@ class DocumentCard extends StatelessWidget {
               Row(
                 children: [
                   _FileTypeIcon(type: document.fileType),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -60,7 +60,7 @@ class DocumentCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
                           detailed
                               ? document.detailSubtitle
@@ -69,7 +69,7 @@ class DocumentCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Color(0xFF8A94A6),
-                            fontSize: 11.5,
+                            fontSize: 10.5,
                             height: 1.2,
                             fontWeight: FontWeight.w500,
                           ),
@@ -77,48 +77,90 @@ class DocumentCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   _DocumentStatuses(document: document),
                 ],
               ),
               if (detailed) ...[
                 const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
+                  padding: EdgeInsets.symmetric(vertical: 5),
                   child: Divider(height: 1),
                 ),
-                Row(
-                  children: [
-                    if (document.canOpen)
-                      _RecommendationPill(document: document)
-                    else
-                      Text(
-                        document.unavailableReportLabel,
-                        style: const TextStyle(
-                          color: Color(0xFF8A94A6),
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    const Spacer(),
-                    Text(
-                      document.dateLabel,
-                      style: const TextStyle(
-                        color: Color(0xFF9AA4B8),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (action != null) ...[
-                      const SizedBox(width: 6),
-                      action!,
-                    ],
-                  ],
-                ),
+                _DocumentFooter(document: document, action: action),
               ],
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+const _dateStyle = TextStyle(
+  color: Color(0xFF9AA4B8),
+  fontSize: 11.5,
+  fontWeight: FontWeight.w600,
+);
+
+class _DocumentFooter extends StatelessWidget {
+  final DashboardDocument document;
+  final Widget? action;
+
+  const _DocumentFooter({required this.document, required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!document.canOpen) {
+      return Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  document.unavailableReportLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF8A94A6),
+                    fontSize: 10.5,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  document.dateLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _dateStyle,
+                ),
+              ],
+            ),
+          ),
+          if (action != null) ...[
+            const SizedBox(width: 6),
+            action!,
+          ],
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: _RecommendationPill(document: document)),
+        const SizedBox(width: 6),
+        Text(
+          document.dateLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _dateStyle,
+        ),
+        if (action != null) ...[
+          const SizedBox(width: 4),
+          action!,
+        ],
+      ],
     );
   }
 }
@@ -132,8 +174,8 @@ class _FileTypeIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final pdf = type == 'PDF';
     return Container(
-      width: 40,
-      height: 44,
+      width: 34,
+      height: 36,
       decoration: BoxDecoration(
         color: pdf ? const Color(0xFFFDEBEA) : const Color(0xFFE8EEFF),
         borderRadius: BorderRadius.circular(9),
@@ -161,7 +203,7 @@ class _RecommendationPill extends StatelessWidget {
     final low = (document.originalityPercent ?? 100) < 60;
     final color = low ? const Color(0xFFD23B41) : const Color(0xFFC67F09);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: low ? const Color(0xFFFCEAEA) : const Color(0xFFFCF1DE),
         borderRadius: BorderRadius.circular(7),
@@ -173,10 +215,17 @@ class _RecommendationPill extends StatelessWidget {
             Icon(Icons.warning_amber_rounded, size: 14, color: color),
             const SizedBox(width: 5),
           ],
-          Text(
-            document.recommendationLabel,
-            style: TextStyle(
-                color: color, fontSize: 11, fontWeight: FontWeight.w700),
+          Flexible(
+            child: Text(
+              document.recommendationLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),

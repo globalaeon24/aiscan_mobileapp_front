@@ -83,6 +83,11 @@ class _OrganizationBillingPageState extends State<OrganizationBillingPage> {
                   const SizedBox(height: 14),
                   TextField(
                     controller: _searchController,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
+                    onTapOutside: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
                     onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
                       hintText: 'Поиск по имени или email...',

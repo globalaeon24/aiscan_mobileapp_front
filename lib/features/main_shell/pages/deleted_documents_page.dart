@@ -158,12 +158,18 @@ class _DeletedDocumentsPageState extends State<DeletedDocumentsPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton.icon(
+                            child: OutlinedButton(
                               onPressed: data.page > 1
                                   ? () => _changePage(data.page - 1)
                                   : null,
-                              icon: const Icon(Icons.chevron_left_rounded),
-                              label: const Text('Назад'),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 6),
+                              ),
+                              child: const _PageButton(
+                                icon: Icons.chevron_left_rounded,
+                                label: 'Назад',
+                              ),
                             ),
                           ),
                           Padding(
@@ -175,12 +181,18 @@ class _DeletedDocumentsPageState extends State<DeletedDocumentsPage> {
                             ),
                           ),
                           Expanded(
-                            child: OutlinedButton.icon(
+                            child: OutlinedButton(
                               onPressed: data.page < data.pages
                                   ? () => _changePage(data.page + 1)
                                   : null,
-                              icon: const Icon(Icons.chevron_right_rounded),
-                              label: const Text('Дальше'),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 6),
+                              ),
+                              child: const _PageButton(
+                                icon: Icons.chevron_right_rounded,
+                                label: 'Дальше',
+                              ),
                             ),
                           ),
                         ],
@@ -204,6 +216,26 @@ class _DeletedDocumentsPageState extends State<DeletedDocumentsPage> {
     }
     return 'документов';
   }
+}
+
+class _PageButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _PageButton({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) => FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 19),
+            const SizedBox(width: 3),
+            Text(label, maxLines: 1),
+          ],
+        ),
+      );
 }
 
 class _DeletedDocumentRow extends StatelessWidget {

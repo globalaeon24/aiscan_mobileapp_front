@@ -15,8 +15,10 @@ class NotificationService {
     if (decoded is! Map<String, dynamic>) {
       throw Exception('Сервер вернул некорректные уведомления.');
     }
+    final candidateItems =
+        decoded['items'] ?? decoded['results'] ?? decoded['data'];
     final rawItems =
-        decoded['items'] is List ? decoded['items'] as List : const <dynamic>[];
+        candidateItems is List ? candidateItems : const <dynamic>[];
     return NotificationFeed(
       items: rawItems
           .whereType<Map>()

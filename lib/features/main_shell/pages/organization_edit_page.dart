@@ -59,6 +59,7 @@ class _OrganizationEditPageState extends State<OrganizationEditPage> {
   }
 
   Future<void> _save() async {
+    FocusScope.of(context).unfocus();
     if (!_dirty || !(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     try {
@@ -99,6 +100,7 @@ class _OrganizationEditPageState extends State<OrganizationEditPage> {
   }
 
   void _cancelEditing() {
+    FocusScope.of(context).unfocus();
     _title.text = _savedValues['title'] ?? '';
     _address.text = _savedValues['address'] ?? '';
     _description.text = _savedValues['description'] ?? '';
@@ -182,22 +184,28 @@ class _OrganizationEditPageState extends State<OrganizationEditPage> {
               ),
           ],
         ),
-        body: SafeArea(
-          top: false,
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              children: [
-                _OrganizationIdentity(title: _savedValues['title'] ?? ''),
-                const SizedBox(height: 16),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: _editing
-                      ? _buildEditForm()
-                      : _OrganizationInformation(values: _savedValues),
-                ),
-              ],
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SafeArea(
+            top: false,
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                children: [
+                  _OrganizationIdentity(title: _savedValues['title'] ?? ''),
+                  const SizedBox(height: 16),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: _editing
+                        ? _buildEditForm()
+                        : _OrganizationInformation(values: _savedValues),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -258,14 +266,21 @@ class _OrganizationEditPageState extends State<OrganizationEditPage> {
             children: [
               TextFormField(
                 controller: _address,
-                keyboardType: TextInputType.multiline,
+                keyboardType: TextInputType.streetAddress,
                 minLines: 1,
                 maxLines: 4,
-                textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                decoration: InputDecoration(
                   labelText: 'Адрес',
                   alignLabelWithHint: true,
-                  prefixIcon: Icon(Icons.place_outlined),
+                  prefixIcon: const Icon(Icons.place_outlined),
+                  suffixIcon: IconButton(
+                    tooltip: 'Закрыть клавиатуру',
+                    onPressed: () => FocusScope.of(context).unfocus(),
+                    icon: const Icon(Icons.keyboard_hide_rounded),
+                  ),
                 ),
                 validator: _required,
               ),
@@ -275,13 +290,19 @@ class _OrganizationEditPageState extends State<OrganizationEditPage> {
                 minLines: 3,
                 maxLines: 8,
                 textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                decoration: InputDecoration(
                   labelText: 'Описание',
                   hintText: 'Кратко опишите организацию',
                   alignLabelWithHint: true,
-                  prefixIcon: Padding(
+                  prefixIcon: const Padding(
                     padding: EdgeInsets.only(bottom: 54),
                     child: Icon(Icons.notes_rounded),
+                  ),
+                  suffixIcon: IconButton(
+                    tooltip: 'Закрыть клавиатуру',
+                    onPressed: () => FocusScope.of(context).unfocus(),
+                    icon: const Icon(Icons.keyboard_hide_rounded),
                   ),
                 ),
               ),

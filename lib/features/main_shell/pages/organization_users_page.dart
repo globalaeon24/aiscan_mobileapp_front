@@ -54,6 +54,11 @@ class _OrganizationUsersPageState extends State<OrganizationUsersPage> {
                 children: [
                   TextField(
                     controller: _searchController,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
+                    onTapOutside: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
                     onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
                       hintText: 'Поиск по ФИО, email, роли...',
@@ -515,6 +520,7 @@ class _UserEditorSheetState extends State<_UserEditorSheet> {
   }
 
   Future<void> _save() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     final payload = <String, dynamic>{
@@ -621,6 +627,8 @@ class _UserEditorSheetState extends State<_UserEditorSheet> {
             const Divider(height: 1, color: OySynAuthTokens.divider),
             Flexible(
               child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
                 child: Form(
                   key: _formKey,
@@ -631,6 +639,9 @@ class _UserEditorSheetState extends State<_UserEditorSheet> {
                       TextFormField(
                         controller: _email,
                         keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        onTapOutside: (_) =>
+                            FocusManager.instance.primaryFocus?.unfocus(),
                         decoration: const InputDecoration(
                           hintText: 'name@example.com',
                           prefixIcon: Icon(Icons.mail_outline_rounded),
@@ -651,6 +662,10 @@ class _UserEditorSheetState extends State<_UserEditorSheet> {
                                 _EditorLabel('Имя'),
                                 TextFormField(
                                   controller: _firstName,
+                                  textInputAction: TextInputAction.next,
+                                  onTapOutside: (_) => FocusManager
+                                      .instance.primaryFocus
+                                      ?.unfocus(),
                                   decoration:
                                       const InputDecoration(hintText: 'Имя'),
                                 ),
@@ -665,6 +680,10 @@ class _UserEditorSheetState extends State<_UserEditorSheet> {
                                 _EditorLabel('Фамилия'),
                                 TextFormField(
                                   controller: _lastName,
+                                  textInputAction: TextInputAction.next,
+                                  onTapOutside: (_) => FocusManager
+                                      .instance.primaryFocus
+                                      ?.unfocus(),
                                   decoration: const InputDecoration(
                                       hintText: 'Фамилия'),
                                 ),
@@ -715,6 +734,10 @@ class _UserEditorSheetState extends State<_UserEditorSheet> {
                       TextFormField(
                         controller: _password,
                         obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _save(),
+                        onTapOutside: (_) =>
+                            FocusManager.instance.primaryFocus?.unfocus(),
                         decoration: InputDecoration(
                           hintText: widget.user == null
                               ? 'Минимум 6 символов'

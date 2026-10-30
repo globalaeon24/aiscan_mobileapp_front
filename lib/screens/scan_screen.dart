@@ -124,6 +124,7 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   Future<void> _upload() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     try {
       final profile = await ProfileService.getProfile();
       if (profile.isNotEmpty) await TokenStorage.saveUser(profile);
@@ -204,6 +205,7 @@ class _ScanScreenState extends State<ScanScreen> {
         ),
       ),
       body: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
         children: [
           const _ModeSelector(),
@@ -840,8 +842,12 @@ class _LabeledField extends StatelessWidget {
                 fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         TextField(
-            controller: controller,
-            decoration: InputDecoration(hintText: hint)),
+          controller: controller,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+          decoration: InputDecoration(hintText: hint),
+        ),
       ],
     );
   }

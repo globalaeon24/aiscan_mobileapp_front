@@ -394,6 +394,15 @@ class _DocumentsPageState extends State<DocumentsPage> {
                             tooltip: 'Переместить в папку',
                             icon: const Icon(Icons.drive_file_move_outlined),
                             color: OySynAuthTokens.primaryBlue,
+                            iconSize: 20,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 34,
+                              height: 34,
+                            ),
+                            style: IconButton.styleFrom(
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             visualDensity: VisualDensity.compact,
                           ),
                           IconButton(
@@ -410,6 +419,15 @@ class _DocumentsPageState extends State<DocumentsPage> {
                                   )
                                 : const Icon(Icons.delete_outline_rounded),
                             color: const Color(0xFFDF3E48),
+                            iconSize: 20,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 34,
+                              height: 34,
+                            ),
+                            style: IconButton.styleFrom(
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             visualDensity: VisualDensity.compact,
                           ),
                         ],
@@ -468,6 +486,8 @@ class _DocumentFilters extends StatelessWidget {
         TextField(
           controller: controller,
           textInputAction: TextInputAction.search,
+          onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           decoration: InputDecoration(
             hintText: 'Поиск по названию или автору',
             prefixIcon: const Icon(Icons.search_rounded),
@@ -867,15 +887,21 @@ class _PaginationControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (totalPages <= 1) return const SizedBox.shrink();
     final label = 'Страница $page из $totalPages · $totalItems документов';
 
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton.icon(
+          child: OutlinedButton(
             onPressed: onPrevious,
-            icon: const Icon(Icons.chevron_left_rounded),
-            label: const Text('Назад'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+            ),
+            child: const _PaginationButtonContent(
+              icon: Icons.chevron_left_rounded,
+              label: 'Назад',
+            ),
           ),
         ),
         Expanded(
@@ -894,15 +920,40 @@ class _PaginationControls extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: OutlinedButton.icon(
+          child: OutlinedButton(
             onPressed: onNext,
-            icon: const Icon(Icons.chevron_right_rounded),
-            label: const Text('Дальше'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+            ),
+            child: const _PaginationButtonContent(
+              icon: Icons.chevron_right_rounded,
+              label: 'Дальше',
+            ),
           ),
         ),
       ],
     );
   }
+}
+
+class _PaginationButtonContent extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _PaginationButtonContent({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) => FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 19),
+            const SizedBox(width: 3),
+            Text(label, maxLines: 1),
+          ],
+        ),
+      );
 }
 
 class _DocumentsMessage extends StatelessWidget {

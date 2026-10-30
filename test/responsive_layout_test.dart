@@ -15,6 +15,7 @@ void main() {
     WidgetTester tester,
     Widget child, {
     Size size = compactAndroid,
+    TextScaler textScaler = TextScaler.noScaling,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
@@ -29,6 +30,7 @@ void main() {
             padding: const EdgeInsets.only(bottom: 24),
             viewPadding: const EdgeInsets.only(bottom: 24),
             systemGestureInsets: const EdgeInsets.only(bottom: 32),
+            textScaler: textScaler,
           ),
           child: child,
         ),
@@ -142,6 +144,66 @@ void main() {
     );
     final lastChoice = tester.getRect(find.text('Вариант 20'));
     expect(lastChoice.bottom, lessThanOrEqualTo(compactAndroid.height - 32));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('long dialog actions stay on one line on a compact screen',
+      (tester) async {
+    await pumpCompact(
+      tester,
+      Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: FilledButton(
+              onPressed: () => showOySynActionDialog(
+                context,
+                title: 'Восстановить документ?',
+                message: 'Документ снова появится в списке пользователя.',
+                confirmLabel: 'Восстановить',
+                icon: Icons.restore_rounded,
+                confirmIcon: Icons.restore_rounded,
+              ),
+              child: const Text('Открыть'),
+            ),
+          ),
+        ),
+      ),
+      size: const Size(320, 640),
+      textScaler: const TextScaler.linear(1.3),
+    );
+
+    await tester.tap(find.text('Открыть'));
+    await tester.pumpAndSettle();
+    expect(find.text('Восстановить'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('folder dialog fits above the compact keyboard area',
+      (tester) async {
+    await pumpCompact(
+      tester,
+      Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: FilledButton(
+              onPressed: () => showOySynTextInputDialog(
+                context,
+                title: 'Новая папка',
+                label: 'Название папки',
+                confirmLabel: 'Создать',
+              ),
+              child: const Text('Открыть'),
+            ),
+          ),
+        ),
+      ),
+      size: const Size(320, 640),
+      textScaler: const TextScaler.linear(1.3),
+    );
+
+    await tester.tap(find.text('Открыть'));
+    await tester.pumpAndSettle();
+    expect(find.text('Создать'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

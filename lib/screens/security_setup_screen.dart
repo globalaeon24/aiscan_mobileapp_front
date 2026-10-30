@@ -42,19 +42,29 @@ class _SecuritySetupScreenState extends State<SecuritySetupScreen> {
       _error = null;
     });
 
-    await SecurityService.savePin(pin);
-    final biometricAvailable = await SecurityService.canUseBiometrics();
-    if (biometricAvailable) {
-      final ok = await SecurityService.authenticateWithBiometrics(
-        reason: 'Включите быстрый вход в OySyn',
-      );
-      await SecurityService.setBiometricEnabled(ok);
-    } else {
-      await SecurityService.setBiometricEnabled(false);
-    }
+    try {
+      await SecurityService.savePin(pin);
+      final biometricAvailable = await SecurityService.canUseBiometrics();
+      if (biometricAvailable) {
+        final ok = await SecurityService.authenticateWithBiometrics(
+          reason: 'Включите быстрый вход в OySyn',
+        );
+        await SecurityService.setBiometricEnabled(ok);
+      } else {
+        await SecurityService.setBiometricEnabled(false);
+      }
 
-    if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed('/mobile-intro');
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/mobile-intro');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = 'Не удалось сохранить код. Повторите попытку.';
+        _firstPin = null;
+      });
+      _pinKey.currentState?.clear();
+    }
   }
 
   void _reset() {

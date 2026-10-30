@@ -134,8 +134,7 @@ class ProfileService {
   static Future<List<Map<String, dynamic>>> getOrganizationBilling(
       int organizationId) async {
     final data = await _get('/organizations/$organizationId/billing');
-    if (data is! List) return const [];
-    return data.whereType<Map<String, dynamic>>().toList();
+    return _mapList(data);
   }
 
   static Future<Map<String, dynamic>> updateOrganizationBilling(
@@ -154,8 +153,18 @@ class ProfileService {
   static Future<List<Map<String, dynamic>>> getOrganizationBillingJournal(
       int organizationId) async {
     final data = await _get('/organizations/$organizationId/billing-journal');
-    if (data is! List) return const [];
-    return data.whereType<Map<String, dynamic>>().toList();
+    return _mapList(data);
+  }
+
+  static List<Map<String, dynamic>> _mapList(dynamic data) {
+    final rows = switch (data) {
+      List<dynamic> value => value,
+      Map<String, dynamic> value =>
+        value['results'] ?? value['items'] ?? value['data'],
+      _ => null,
+    };
+    if (rows is! List) return const [];
+    return rows.whereType<Map<String, dynamic>>().toList();
   }
 
   static Future<Map<String, dynamic>> getOrganizationReports(

@@ -32,37 +32,21 @@ class _DashboardHeaderState extends State<DashboardHeader> {
     if (_openingNotifications) return;
     setState(() => _openingNotifications = true);
     try {
-      final feed = await NotificationService.fetch();
-      await NotificationService.markAllRead();
-      if (!mounted) return;
-      setState(() {
-        _feed = Future.value(NotificationFeed(
-          items: feed.items,
-          unreadCount: 0,
-        ));
-      });
       final check = await showModalBottomSheet<ScanResult>(
         context: context,
         useSafeArea: true,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => _NotificationsSheet(items: feed.items),
+        builder: (_) => const _NotificationsSheet(),
       );
-      if (check == null || !mounted) return;
+      if (!mounted) return;
+      setState(() => _feed = NotificationService.fetch());
+      if (check == null) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ScanDetailsScreen(
             result: check,
             loadFromBackend: true,
-          ),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            error.toString().replaceFirst('Exception: ', ''),
           ),
         ),
       );
@@ -197,10 +181,25 @@ class _DashboardHeaderState extends State<DashboardHeader> {
   }
 }
 
-class _NotificationsSheet extends StatelessWidget {
-  final List<AppNotification> items;
+class _NotificationsSheet extends StatefulWidget {
+  const _NotificationsSheet();
 
-  const _NotificationsSheet({required this.items});
+  @override
+  State<_NotificationsSheet> createState() => _NotificationsSheetState();
+}
+
+class _NotificationsSheetState extends State<_NotificationsSheet> {
+  late Future<NotificationFeed> _future = _load();
+
+  Future<NotificationFeed> _load() async {
+    final feed = await NotificationService.fetch();
+    if (feed.unreadCount > 0) {
+      NotificationService.markAllRead().catchError((_) {});
+    }
+    return feed;
+  }
+
+  void _retry() => setState(() => _future = _load());
 
   @override
   Widget build(BuildContext context) => Container(
@@ -221,112 +220,180 @@ class _NotificationsSheet extends StatelessWidget {
             const SizedBox(height: 10),
             const Text('Уведомления', style: OySynTextStyles.sectionTitle),
             const SizedBox(height: 12),
-            if (items.isEmpty)
-              Padding(
-                padding: EdgeInsets.only(
-                  bottom: 24 + oysynSystemBottomInset(context),
-                ),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: OySynAuthTokens.divider),
-                  ),
-                  child: const Text(
-                    'Уведомлений пока нет',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: OySynAuthTokens.textMuted),
-                  ),
-                ),
-              )
-            else
-              Flexible(
-                child: ListView.separated(
-                  padding: EdgeInsets.only(
-                    bottom: 24 + oysynSystemBottomInset(context),
-                  ),
-                  itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
-                        onTap: item.check == null
-                            ? null
-                            : () => Navigator.of(context).pop(item.check),
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: OySynAuthTokens.divider,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: (item.failed
-                                          ? const Color(0xFFE13F4B)
-                                          : const Color(0xFF15945B))
-                                      .withValues(alpha: .1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  item.failed
-                                      ? Icons.error_outline_rounded
-                                      : Icons.task_alt_rounded,
-                                  color: item.failed
-                                      ? const Color(0xFFE13F4B)
-                                      : const Color(0xFF15945B),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.title,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      item.body,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: OySynAuthTokens.textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (item.check != null) ...[
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.chevron_right_rounded,
-                                  color: OySynAuthTokens.iconGrey,
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
+            Flexible(
+              child: FutureBuilder<NotificationFeed>(
+                future: _future,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return _NotificationsError(
+                      message: snapshot.error
+                          .toString()
+                          .replaceFirst('Exception: ', ''),
+                      onRetry: _retry,
                     );
-                  },
-                ),
+                  }
+                  final items =
+                      snapshot.data?.items ?? const <AppNotification>[];
+                  if (items.isEmpty) {
+                    return const _EmptyNotifications();
+                  }
+                  return _NotificationsList(items: items);
+                },
               ),
+            ),
           ],
         ),
+      );
+}
+
+class _EmptyNotifications extends StatelessWidget {
+  const _EmptyNotifications();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: 24 + oysynSystemBottomInset(context),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: OySynAuthTokens.divider),
+          ),
+          child: const Text(
+            'Уведомлений пока нет',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: OySynAuthTokens.textMuted),
+          ),
+        ),
+      );
+}
+
+class _NotificationsError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _NotificationsError({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: 24 + oysynSystemBottomInset(context),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.notifications_off_outlined,
+                color: OySynAuthTokens.iconGrey,
+                size: 34,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: OySynAuthTokens.textMuted),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Повторить'),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class _NotificationsList extends StatelessWidget {
+  final List<AppNotification> items;
+
+  const _NotificationsList({required this.items});
+
+  @override
+  Widget build(BuildContext context) => ListView.separated(
+        padding: EdgeInsets.only(
+          bottom: 24 + oysynSystemBottomInset(context),
+        ),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: item.check == null
+                  ? null
+                  : () => Navigator.of(context).pop(item.check),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: OySynAuthTokens.divider),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: (item.failed
+                                ? const Color(0xFFE13F4B)
+                                : const Color(0xFF15945B))
+                            .withValues(alpha: .1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        item.failed
+                            ? Icons.error_outline_rounded
+                            : Icons.task_alt_rounded,
+                        color: item.failed
+                            ? const Color(0xFFE13F4B)
+                            : const Color(0xFF15945B),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            item.body,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: OySynAuthTokens.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (item.check != null) ...[
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: OySynAuthTokens.iconGrey,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       );
 }

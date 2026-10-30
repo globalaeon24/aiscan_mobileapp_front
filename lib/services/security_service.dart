@@ -3,6 +3,7 @@ import 'dart:isolate';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -15,9 +16,11 @@ class SecurityService {
   static const _pinHashKey = 'security_pin_hash';
   static const _pinSaltKey = 'security_pin_salt';
   static const _pinAlgorithmKey = 'security_pin_algorithm';
+  static const _pinIterationsKey = 'security_pin_iterations';
   static const _pinAlgorithm = 'pbkdf2-sha256-v1';
   static const _biometricEnabledKey = 'security_biometric_enabled';
   static const _pinIterations = 120000;
+  static const _webPinIterations = 10000;
 
   static Future<bool> isSecurityConfigured() async {
     final hash = await _storage.read(key: _pinHashKey);
@@ -25,6 +28,7 @@ class SecurityService {
   }
 
   static Future<void> savePin(String pin) async {
+    final iterations = kIsWeb ? _webPinIterations : _pinIterations;
     final random = Random.secure();
     final salt = base64UrlEncode(
       List<int>.generate(32, (_) => random.nextInt(256)),
@@ -32,9 +36,13 @@ class SecurityService {
     await _storage.write(key: _pinSaltKey, value: salt);
     await _storage.write(
       key: _pinHashKey,
-      value: await _hashPin(pin, salt),
+      value: await _hashPin(pin, salt, iterations),
     );
     await _storage.write(key: _pinAlgorithmKey, value: _pinAlgorithm);
+    await _storage.write(
+      key: _pinIterationsKey,
+      value: '$iterations',
+    );
   }
 
   static Future<bool> verifyPin(String pin) async {
@@ -49,10 +57,18 @@ class SecurityService {
       return true;
     }
     if (algorithm != _pinAlgorithm) return false;
-    return _constantTimeEquals(await _hashPin(pin, salt), hash);
+    final storedIterations = int.tryParse(
+      await _storage.read(key: _pinIterationsKey) ?? '',
+    );
+    final iterations = storedIterations ?? _pinIterations;
+    return _constantTimeEquals(
+      await _hashPin(pin, salt, iterations),
+      hash,
+    );
   }
 
   static Future<bool> canUseBiometrics() async {
+    if (kIsWeb) return false;
     try {
       final supported = await _auth.isDeviceSupported();
       final canCheck = await _auth.canCheckBiometrics;
@@ -91,12 +107,20 @@ class SecurityService {
     await _storage.delete(key: _pinHashKey);
     await _storage.delete(key: _pinSaltKey);
     await _storage.delete(key: _pinAlgorithmKey);
+    await _storage.delete(key: _pinIterationsKey);
     await _storage.delete(key: _biometricEnabledKey);
   }
 
-  static Future<String> _hashPin(String pin, String salt) {
+  static Future<String> _hashPin(
+    String pin,
+    String salt,
+    int iterations,
+  ) {
+    if (kIsWeb) {
+      return Future<String>(() => _derivePinHash(pin, salt, iterations));
+    }
     return Isolate.run(
-      () => _derivePinHash(pin, salt, _pinIterations),
+      () => _derivePinHash(pin, salt, iterations),
     );
   }
 

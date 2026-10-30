@@ -1,15 +1,48 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../services/profile_service.dart';
 import '../../../theme/app_theme.dart';
 
-class OrganizationBillingJournalPage extends StatelessWidget {
+class OrganizationBillingJournalPage extends StatefulWidget {
   final int organizationId;
 
   const OrganizationBillingJournalPage({
     super.key,
     required this.organizationId,
   });
+
+  @override
+  State<OrganizationBillingJournalPage> createState() =>
+      _OrganizationBillingJournalPageState();
+}
+
+class _OrganizationBillingJournalPageState
+    extends State<OrganizationBillingJournalPage> {
+  late Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  Future<List<Map<String, dynamic>>> _load() =>
+      ProfileService.getOrganizationBillingJournal(widget.organizationId)
+          .timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => throw TimeoutException(
+          'Сервер не ответил вовремя. Повторите попытку.',
+        ),
+      );
+
+  Future<void> _retry() async {
+    setState(() => _future = _load());
+    try {
+      await _future;
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -22,13 +55,49 @@ class OrganizationBillingJournalPage extends StatelessWidget {
           ),
         ),
         body: FutureBuilder<List<Map<String, dynamic>>>(
-          future: ProfileService.getOrganizationBillingJournal(organizationId),
+          future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return const Center(child: Text('Не удалось загрузить журнал'));
+              final message = snapshot.error
+                  .toString()
+                  .replaceFirst('TimeoutException: ', '')
+                  .replaceFirst('Exception: ', '');
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.cloud_off_rounded,
+                        size: 38,
+                        color: OySynAuthTokens.textMuted,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Не удалось загрузить журнал',
+                        textAlign: TextAlign.center,
+                        style: OySynTextStyles.cardTitle,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: OySynTextStyles.caption,
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: _retry,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Повторить'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             }
             final rows = snapshot.data ?? const [];
             final added = rows.fold<int>(0, (sum, row) {

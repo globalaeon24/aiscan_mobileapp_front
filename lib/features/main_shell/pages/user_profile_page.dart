@@ -332,52 +332,41 @@ class _Tabs extends StatelessWidget {
     return Row(
       children: List.generate(items.length, (index) {
         final active = selected == index;
+        final label = items[index].$2;
         return Expanded(
           child: Padding(
             padding: EdgeInsets.only(
-              right: index == items.length - 1 ? 0 : 6,
+              right: index == items.length - 1 ? 0 : 8,
             ),
-            child: Material(
-              color: active ? OySynAuthTokens.primaryBlue : Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              child: InkWell(
-                onTap: () => onChanged(index),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  height: 42,
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: active
-                          ? OySynAuthTokens.primaryBlue
-                          : OySynAuthTokens.divider,
-                    ),
-                  ),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          items[index].$1,
-                          size: 16,
-                          color:
-                              active ? Colors.white : OySynAuthTokens.textMuted,
+            child: Tooltip(
+              message: label,
+              child: Semantics(
+                button: true,
+                selected: active,
+                label: label,
+                child: Material(
+                  color: active ? OySynAuthTokens.primaryBlue : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () => onChanged(index),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: active
+                              ? OySynAuthTokens.primaryBlue
+                              : OySynAuthTokens.divider,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          items[index].$2,
-                          maxLines: 1,
-                          style: TextStyle(
-                            color: active
-                                ? Colors.white
-                                : OySynAuthTokens.textDark,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
+                      ),
+                      child: Icon(
+                        items[index].$1,
+                        size: 22,
+                        color:
+                            active ? Colors.white : OySynAuthTokens.textMuted,
+                      ),
                     ),
                   ),
                 ),
@@ -803,7 +792,14 @@ class _EditField extends StatelessWidget {
                     color: OySynAuthTokens.textMuted,
                     fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
-            TextField(controller: controller, keyboardType: keyboardType),
+            TextField(
+              controller: controller,
+              keyboardType: keyboardType,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+              onTapOutside: (_) =>
+                  FocusManager.instance.primaryFocus?.unfocus(),
+            ),
           ],
         ),
       );

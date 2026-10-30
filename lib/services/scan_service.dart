@@ -600,14 +600,20 @@ class ScanService {
     } else if (res.statusCode == 404) {
       throw Exception("Проверка не найдена.");
     } else {
-      throw Exception("Ошибка загрузки: ${res.statusCode} ${res.body}");
+      throw Exception(_responseMessage(
+        res.body,
+        'Не удалось загрузить проверку (${res.statusCode}).',
+      ));
     }
   }
 
   static Future<CheckReport> getReport(int id) async {
     final response = await ApiService.get('/checks/$id/report');
     if (response.statusCode != 200) {
-      throw Exception('Отчёт пока недоступен: ${response.statusCode}');
+      throw Exception(_responseMessage(
+        response.body,
+        'Отчёт пока недоступен (${response.statusCode}).',
+      ));
     }
     return CheckReport.fromJson(jsonDecode(response.body));
   }
@@ -624,6 +630,28 @@ class ScanService {
     final response = await ApiService.get(uri.toString());
     if (response.statusCode != 200) {
       throw Exception('Не удалось получить PDF: ${response.statusCode}');
+    }
+    return response.bodyBytes;
+  }
+
+  static Future<Uint8List> getPairReportPdf(
+    int id, {
+    String reportType = 'full',
+    String language = 'ru',
+  }) async {
+    if (reportType != 'full' && reportType != 'short') {
+      throw ArgumentError.value(reportType, 'reportType');
+    }
+    final uri = Uri(
+      path: '/checks/pair-checks/$id/report/pdf/$reportType',
+      queryParameters: {'lang': language},
+    );
+    final response = await ApiService.get(uri.toString());
+    if (response.statusCode != 200) {
+      throw Exception(_responseMessage(
+        response.body,
+        'PDF-отчёт пока недоступен (${response.statusCode}).',
+      ));
     }
     return response.bodyBytes;
   }

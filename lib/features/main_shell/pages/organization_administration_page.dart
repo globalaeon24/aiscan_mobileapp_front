@@ -360,16 +360,18 @@ class _AdministrationTabs extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Flexible(
-                        child: Text(
-                          items[index].$2,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: active
-                                ? OySynAuthTokens.deepBlue
-                                : OySynAuthTokens.textMuted,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            items[index].$2,
+                            maxLines: 1,
+                            style: TextStyle(
+                              color: active
+                                  ? OySynAuthTokens.deepBlue
+                                  : OySynAuthTokens.textMuted,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
@@ -409,35 +411,39 @@ class _AdministrationHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: OySynAuthTokens.divider),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF0FF),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, color: OySynAuthTokens.primaryBlue, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: OySynTextStyles.cardTitle),
-                const SizedBox(height: 3),
-                Text(description, style: OySynTextStyles.caption),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          FilledButton.icon(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 430;
+          final heading = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF0FF),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: OySynAuthTokens.primaryBlue, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: OySynTextStyles.cardTitle),
+                    const SizedBox(height: 3),
+                    Text(description, style: OySynTextStyles.caption),
+                  ],
+                ),
+              ),
+            ],
+          );
+          final saveButton = FilledButton.icon(
             onPressed: saving ? null : onSave,
             style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 42),
-              padding: const EdgeInsets.symmetric(horizontal: 13),
+              minimumSize: Size(compact ? double.infinity : 0, 42),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
             ),
             icon: saving
                 ? const SizedBox(
@@ -449,9 +455,27 @@ class _AdministrationHeader extends StatelessWidget {
                     ),
                   )
                 : const Icon(Icons.save_outlined, size: 18),
-            label: const Text('Сохранить'),
-          ),
-        ],
+            label: const Text('Сохранить', maxLines: 1),
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                heading,
+                const SizedBox(height: 12),
+                saveButton,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: heading),
+              const SizedBox(width: 16),
+              saveButton,
+            ],
+          );
+        },
       ),
     );
   }
@@ -694,6 +718,7 @@ class _ApiTokenSheetState extends State<_ApiTokenSheet> {
   }
 
   void _submit() {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (!(_formKey.currentState?.validate() ?? false) || _userId == null) {
       return;
     }
@@ -721,6 +746,7 @@ class _ApiTokenSheetState extends State<_ApiTokenSheet> {
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,6 +761,9 @@ class _ApiTokenSheetState extends State<_ApiTokenSheet> {
               else ...[
                 TextFormField(
                   controller: _name,
+                  textInputAction: TextInputAction.next,
+                  onTapOutside: (_) =>
+                      FocusManager.instance.primaryFocus?.unfocus(),
                   decoration: const InputDecoration(labelText: 'Наименование'),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Заполните поле'
@@ -774,6 +803,10 @@ class _ApiTokenSheetState extends State<_ApiTokenSheet> {
                   TextFormField(
                     controller: _checks,
                     keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submit(),
+                    onTapOutside: (_) =>
+                        FocusManager.instance.primaryFocus?.unfocus(),
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration:
                         const InputDecoration(labelText: 'Количество проверок'),

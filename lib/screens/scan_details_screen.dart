@@ -60,8 +60,11 @@ class _ScanDetailsScreenState extends State<ScanDetailsScreen> {
     if (_isCompleted(detail.status)) {
       try {
         report = await ScanService.getReport(widget.result.id);
-      } catch (_) {
-        reportMessage ??= 'Отчёт формируется. Обновите страницу немного позже.';
+      } catch (error) {
+        final message = error.toString().replaceFirst('Exception: ', '').trim();
+        reportMessage ??= message.isEmpty
+            ? 'Отчёт формируется. Обновите страницу немного позже.'
+            : message;
       }
     } else if (_isFailed(detail.status)) {
       reportMessage ??= 'Core не смог завершить проверку документа.';

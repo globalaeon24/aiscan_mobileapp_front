@@ -10,6 +10,7 @@ import 'screens/security_unlock_screen.dart';
 import 'services/security_service.dart';
 import 'services/app_update_service.dart';
 import 'storage/token_storage.dart';
+import 'widgets/keyboard_dismiss_area.dart';
 
 /// 🔴 ГЛОБАЛЬНЫЙ navigatorKey
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -72,6 +73,9 @@ class _ScanAIAppState extends State<ScanAIApp> with WidgetsBindingObserver {
       title: 'ScanAI',
       theme: buildAppTheme(),
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => KeyboardDismissArea(
+        child: child ?? const SizedBox.shrink(),
+      ),
       initialRoute: widget.initialRoute,
       routes: {
         '/login': (_) => const LoginRegisterScreen(),
